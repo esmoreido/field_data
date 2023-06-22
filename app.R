@@ -8,12 +8,15 @@ library(RPostgreSQL)
 library(tidyverse)
 
 # Define UI for data upload app ----
-ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",includeHTML("footer.html")),
-# Метеостанции ----
+ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
+                 fluid = T, windowTitle = "КрымДанные", lang = "ru",
+                 
+                 # Метеостанции ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+
                             # App title ----
                             titlePanel("Загрузка файлов с метеостанций"),
                             
@@ -58,26 +61,27 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",i
                             )
                           )
                  ),
-tabPanel(title = "Просмотр",
-         fluidPage(
-           shinyjs::useShinyjs(),
-           shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-           # App title ----
-           titlePanel("Просмотр данных"),
-           sidebarLayout(
-             sidebarPanel(
-               uiOutput('ui_stations', ),
-               uiOutput('ui_var'),
-               actionButton("plot_graph", "Создать"),
-               actionButton("reset2", "Очистить")
-             ),
-             mainPanel(
-               div(style='overflow-y: scroll', 
-                   plotOutput('plotdata')),
-               dataTableOutput("datatable")
-             )
-           )
-         ))
+                 tabPanel(title = "Просмотр",
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            
+                            # App title ----
+                            titlePanel("Просмотр данных"),
+                            sidebarLayout(
+                              sidebarPanel(
+                                uiOutput('ui_stations', ),
+                                uiOutput('ui_var'),
+                                actionButton("plot_graph", "Создать"),
+                                actionButton("reset2", "Очистить")
+                              ),
+                              mainPanel(
+                                div(style='overflow-y: scroll', 
+                                    plotOutput('plotdata')),
+                                dataTableOutput("datatable")
+                              )
+                            )
+                          ))
 )
 
 # Define server logic to read selected file ----
