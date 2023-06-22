@@ -113,7 +113,8 @@ server <- function(input, output) {
   
   output$contents <- renderDataTable(
     input_df(), 
-      options = list(pageLength = 10)
+      options = list(pageLength = 10, 
+                     language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
   )
   
   observeEvent(input$insert_df, {
