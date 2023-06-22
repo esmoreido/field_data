@@ -12,10 +12,18 @@ con <- dbConnect(drv, dbname = "hydromet",
 rm(mypaw)
 dbListTables(con)
 dbListFields(con, 'field_data')
+dbGetQuery(con, "SHOW CLIENT_ENCODING")
 
-q <- "SELECT station, variable, count(*) from field_data GROUP BY station, variable"
+st <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
+st
+Encoding(st$station)
+q <- paste0("SELECT datetime, variable, value FROM field_data WHERE variable IN ('Rain', 'TempOut') AND station IN ('", 
+            st$station, "') ORDER BY datetime")
+Encoding(q)
+q
+
 res <- dbGetQuery(con, q)
-res$variable[1]
+
 
 rm <- "DELETE FROM field_data"
 dbExecute(con, rm)

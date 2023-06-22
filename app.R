@@ -1,6 +1,9 @@
 library(shiny)
 library(shinyjs)
+library(shinyWidgets)
 library(dplyr)
+library(ggplot2)
+library(plotly)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
@@ -8,7 +11,7 @@ library(tidyverse)
 # Define UI for data upload app ----
 ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",includeHTML("footer.html")),
 # Метеостанции ----
-                 tabPanel(title = "Метеостанции", 
+                 tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
@@ -41,7 +44,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",i
                                 
                                 # Insert button ----
                                 actionButton("insert_df", "Загрузить"),
-                                actionButton("reset", "Очистить")
+                                actionButton("reset1", "Очистить")
                                 
                               ),
                               
@@ -55,15 +58,51 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",i
                               
                             )
                           )
-                 )
+                 ),
+tabPanel(title = "Просмотр",
+         fluidPage(
+           shinyjs::useShinyjs(),
+           shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+           # App title ----
+           titlePanel("Просмотр данных"),
+           sidebarLayout(
+             sidebarPanel(
+               uiOutput('ui_stations', ),
+               uiOutput('ui_var'),
+               actionButton("plot_graph", "Создать"),
+               actionButton("reset2", "Очистить")
+             ),
+             mainPanel(
+               div(style='overflow-y: scroll', 
+                   plotOutput('plotdata')),
+               dataTableOutput("datatable")
+             )
+           )
+         ))
 )
 
 # Define server logic to read selected file ----
-server <- function(input, output) {
+server <- function(input, output, session) {
+  mypaw <- {
+    "vnFkY9Vj"
+  }
+  drv <- dbDriver("PostgreSQL")
+  tryCatch({
+    con <- dbConnect(drv, dbname = "hydromet",
+                     host = "192.168.5.203", port = 5432,
+                     user = "moreydo", password = mypaw)
+    print('Connected')
+  },
+  error = function(e) {
+    # return a safeError if a parsing error occurs
+    output$qry <- renderText("Error connecting to database!")
+    stop(safeError(e))
+  })
+  rm(mypaw)
   
-  observeEvent(input$reset, {
+  observeEvent(c(input$reset1,input$reset2), {
     shinyjs::js$refresh_page()
-  })  
+  }, ignoreNULL = T, ignoreInit = T)  
   
   input_df <- reactive({
     # input$file1 will be NULL initially. After the user selects
@@ -109,21 +148,6 @@ server <- function(input, output) {
   observeEvent(input$insert_df, {
     
     output$qry <- renderText({
-      mypaw <- {
-        "vnFkY9Vj"
-      }
-      drv <- dbDriver("PostgreSQL")
-      tryCatch({
-        con <- dbConnect(drv, dbname = "hydromet",
-                         host = "192.168.5.203", port = 5432,
-                         user = "moreydo", password = mypaw)
-      },
-      error = function(e) {
-        # return a safeError if a parsing error occurs
-        output$qry <- renderText("Error connecting to database!")
-        stop(safeError(e))
-      })
-      rm(mypaw)
       # количество исходных строк
       n_init <- nrow(input_df())
       # количество исходных переменных как количество столбцов минус название, датавремя, дата, время
@@ -157,9 +181,65 @@ server <- function(input, output) {
       return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
                    '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
     })
+  })
+  
+  output$ui_stations <- renderUI({
+    st_list <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
+    selectInput('pick_station',
+                label ='Метеостанции',
+                choices=st_list$station,
+                selected = NULL, multiple = TRUE)
+  })
+  output$ui_var <- renderUI({
+    var <- dbGetQuery(con, "SELECT DISTINCT variable FROM field_data")
+    pickerInput('pick_var',
+                label ='Данные по оси X',
+                choices=var$variable,
+                selected = NULL, 
+                options = list(`actions-box` = TRUE,
+                               `deselect-all-text` = "Отменить",
+                               `select-all-text` = "Выбрать всё",
+                               `none-selected-text` = "Выберите..."), 
+                multiple = T)
+  })
+  
+  plot_df <- reactive({
+    req(input$pick_station, input$pick_var)
+    q <- paste0("SELECT datetime, station, variable, value FROM field_data WHERE variable IN (\'", 
+                paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
+                paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
+    print(q)
+    # q <- enc2utf8(q)
+    tryCatch({
+      df <- dbGetQuery(con, q)
+    },
+    error = function(e) return(e)
+    )
     
   })
-  lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(con = x)})
+  
+  observeEvent(input$plot_graph, {
+    output$plotdata <- renderPlot({
+      withProgress(expr = {
+        ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
+          facet_wrap(variable~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
+          scale_x_datetime(date_labels = "%d.%m.%y") +
+          # theme_light(base_size = 16) + 
+          theme(legend.position = 'top') + 
+          labs(x='Дата', y='', col='')}, message = "Загрузка...")
+    })
+    output$datatable <- renderDataTable(
+      plot_df() %>%
+        pivot_wider(id_cols = 'datetime', names_from = c('station', 'variable'), values_from = 'value'),
+      options = list(pageLength = 100, 
+                     language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
+    )
+  })
+  
+  session$onSessionEnded(function() {
+    lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
+    print('Disconnected')
+  })
 }
 # Create Shiny app ----
 shinyApp(ui, server)
