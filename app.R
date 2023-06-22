@@ -28,7 +28,7 @@ ui <- fluidPage(
   shinyjs::useShinyjs(),
   shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
   # App title ----
-  titlePanel("Загрузка файлов с метеостанции"),
+  titlePanel("Загрузка файлов с метеостанций"),
   
   # Sidebar layout with input and output definitions ----
   sidebarLayout(
@@ -97,7 +97,7 @@ server <- function(input, output) {
         df <- df %>%
           mutate(datetime = parse_date_time(paste(Date, Time), orders = "%d.%m.%y %H:%M", tz = 'GMT'),
                  station_name = input$station_name) %>%
-          filter(is.na(datetime)) %>%
+          filter(!is.na(datetime)) %>%
           relocate(station_name, datetime) %>%
           mutate(pres_mm = Bar * 0.75006150504341, 
                  WindDir = as.integer(factor(WindDir, ordered = T)), 
@@ -112,7 +112,7 @@ server <- function(input, output) {
   })
   
   output$contents <- renderDataTable({
-      return(input_df())
+      input_df()
   })
   
   observeEvent(input$insert_df, {
