@@ -6,7 +6,7 @@ library(RPostgreSQL)
 library(tidyverse)
 
 # Define UI for data upload app ----
-ui <- navbarPage(title = "КрымДанные",
+ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer",includeHTML("footer.html")),
 # Метеостанции ----
                  tabPanel(title = "Метеостанции", 
                           fluidPage(
@@ -124,8 +124,10 @@ server <- function(input, output) {
         stop(safeError(e))
       })
       rm(mypaw)
+      # количество исходных строк
       n_init <- nrow(input_df())
-      nvar <- ncol(input_df())
+      # количество исходных переменных как количество столбцов минус название, датавремя, дата, время
+      nvar <- ncol(input_df()) - 4
       df <- input_df() %>%
         dplyr::select(!c(Date, Time)) %>%
         pivot_longer(cols = !c(datetime, station_name),

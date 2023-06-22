@@ -20,3 +20,5 @@ res$variable[1]
 rm <- "DELETE FROM field_data"
 dbExecute(con, rm)
 dbDisconnect(con)
+
+
