@@ -116,7 +116,8 @@ server <- function(input, output) {
         stop(safeError(e))
       })
       rm(mypaw)
-      
+      n_init <- nrow(input_df())
+      nvar <- ncol(input_df())
       df <- input_df() %>%
         dplyr::select(!c(Date, Time)) %>%
         pivot_longer(cols = !c(datetime, station_name),
@@ -130,10 +131,10 @@ server <- function(input, output) {
       on.exit(progress$close())
       progress$set(message = "Загрузка", value = 0)
       n <- nrow(df)
-      print(n)
+      # print(n)
       for (i in 1:n) {
         q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
-        print(q)
+        # print(q)
         
         progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
         tryCatch({
@@ -143,7 +144,8 @@ server <- function(input, output) {
         )
         
       }
-      return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name))
+      return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
+                   '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
     })
     
   })
