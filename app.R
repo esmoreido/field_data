@@ -37,7 +37,7 @@ ui <- fluidPage(
     sidebarPanel(
       
       selectInput("station_name", "Название метеостанции", 
-                  choices = c('Ольмесхыр', 'Многоречье', 'Кизилкобинка', 'Чатырдаг', 'Караби')),
+                  choices = c('Ольмесхыр', 'Многоречье', 'Кизилкобинка', 'Караби')), # 'Чатырдаг', 
       
       # Horizontal line ----
       tags$hr(),
@@ -111,9 +111,10 @@ server <- function(input, output) {
     )
   })
   
-  output$contents <- renderDataTable({
-      input_df()
-  })
+  output$contents <- renderDataTable(
+    input_df(), 
+      options = list(pageLength = 10)
+  )
   
   observeEvent(input$insert_df, {
     
