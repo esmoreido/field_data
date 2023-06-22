@@ -6,49 +6,56 @@ library(RPostgreSQL)
 library(tidyverse)
 
 # Define UI for data upload app ----
-ui <- fluidPage(
-  shinyjs::useShinyjs(),
-  shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-  # App title ----
-  titlePanel("Загрузка файлов с метеостанций"),
-  
-  # Sidebar layout with input and output definitions ----
-  sidebarLayout(
-    
-    # Sidebar panel for inputs ----
-    sidebarPanel(
-      
-      selectInput("station_name", "Название метеостанции", 
-                  choices = c('Ольмесхыр', 'Многоречье', 'Кизилкобинка', 'Караби')), # 'Чатырдаг', 
-      
-      # Horizontal line ----
-      tags$hr(),
-      
-      
-      # Input: Select a file ----
-      fileInput("file1", "Выбрать файл",
-                multiple = FALSE,
-                accept = c("text/csv",
-                           "text/comma-separated-values,text/plain",
-                           ".csv")),
-      # Horizontal line ----
-      tags$hr(),
-      
-      # Insert button ----
-      actionButton("insert_df", "Загрузить"),
-      actionButton("reset", "Очистить")
-      
-    ),
-    
-    # Main panel for displaying outputs ----
-    mainPanel(
-      
-      # Output: Data file ----
-      dataTableOutput("contents"),
-      h2(textOutput("qry"))
-    )
-    
-  )
+ui <- navbarPage(title = "КрымДанные",
+# Метеостанции ----
+                 tabPanel(title = "Метеостанции", 
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            # App title ----
+                            titlePanel("Загрузка файлов с метеостанций"),
+                            
+                            # Sidebar layout with input and output definitions ----
+                            sidebarLayout(
+                              
+                              # Добавление файла ----
+                              sidebarPanel(
+                                
+                                selectInput("station_name", "Название метеостанции", 
+                                            choices = c('Ольмесхыр', 'Многоречье', 'Кизилкобинка', 'Караби')), # 'Чатырдаг', 
+                                
+                                # Horizontal line ----
+                                tags$hr(),
+                                
+                                
+                                # Input: Select a file ----
+                                fileInput("file1", "Выбрать файл",
+                                          multiple = FALSE,
+                                          accept = c("text/csv",
+                                                     "text/comma-separated-values,text/plain",
+                                                     ".csv"),
+                                          buttonLabel = "Выбрать...",
+                                          placeholder = "Файл не выбран"),
+                                # Horizontal line ----
+                                tags$hr(),
+                                
+                                # Insert button ----
+                                actionButton("insert_df", "Загрузить"),
+                                actionButton("reset", "Очистить")
+                                
+                              ),
+                              
+                              # Main panel for displaying outputs ----
+                              mainPanel(
+                                
+                                # Output: Data file ----
+                                dataTableOutput("contents"),
+                                h2(textOutput("qry"))
+                              )
+                              
+                            )
+                          )
+                 )
 )
 
 # Define server logic to read selected file ----
@@ -64,7 +71,8 @@ server <- function(input, output) {
     # or all rows if selected, will be shown.
     
     req(input$file1)
-    
+    validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
+                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"))
     # when reading semicolon separated files,
     # having a comma separator causes `read.csv` to error
     tryCatch(
