@@ -5,24 +5,6 @@ library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
 
-mypaw <- {
-  "vnFkY9Vj"
-}
-drv <- dbDriver("PostgreSQL")
-tryCatch({
-  con <- dbConnect(drv, dbname = "hydromet",
-                   host = "192.168.5.203", port = 5432,
-                   user = "moreydo", password = mypaw)
-},
-error = function(e) {
-  # return a safeError if a parsing error occurs
-  output$qry <- renderText("Error connecting to database!")
-  stop(safeError(e))
-})
-rm(mypaw)
-
-
-
 # Define UI for data upload app ----
 ui <- fluidPage(
   shinyjs::useShinyjs(),
@@ -101,8 +83,7 @@ server <- function(input, output) {
           relocate(station_name, datetime) %>%
           mutate(pres_mm = Bar * 0.75006150504341, 
                  WindDir = as.integer(factor(WindDir, ordered = T)), 
-                 HiDir = as.integer(factor(HiDir, ordered = T))) # %>%
-          # select(!c(Date, Time))
+                 HiDir = as.integer(factor(HiDir, ordered = T)))
       },
       error = function(e) {
         # return a safeError if a parsing error occurs
@@ -113,42 +94,59 @@ server <- function(input, output) {
   
   output$contents <- renderDataTable(
     input_df(), 
-      options = list(pageLength = 10, 
-                     language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
+    options = list(pageLength = 10, 
+                   language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
   )
   
   observeEvent(input$insert_df, {
     
-  output$qry <- renderText({
-    
-        df <- pivot_longer(input_df(), cols = !c(datetime, station_name),
-                           names_to = 'variable', values_to = 'value')
-          created_on <- now()
-          data_source <- 'shiny_app'
-          type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
-          # Create a Progress object
-          progress <- shiny::Progress$new()
-          # Make sure it closes when we exit this reactive, even if there's an error
-          on.exit(progress$close())
-          progress$set(message = "Загрузка", value = 0)
-          n <- nrow(df)
-          print(n)
-          for (i in 1:n) {
-          q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
-          print(q)
-          
-          progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
-          tryCatch({
-            dbExecute(con, q)
-          },
-            error = function(e) print(e)
-          )
-          
-          }
-          return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name))
+    output$qry <- renderText({
+      mypaw <- {
+        "vnFkY9Vj"
+      }
+      drv <- dbDriver("PostgreSQL")
+      tryCatch({
+        con <- dbConnect(drv, dbname = "hydromet",
+                         host = "192.168.5.203", port = 5432,
+                         user = "moreydo", password = mypaw)
+      },
+      error = function(e) {
+        # return a safeError if a parsing error occurs
+        output$qry <- renderText("Error connecting to database!")
+        stop(safeError(e))
       })
-  
+      rm(mypaw)
+      
+      df <- input_df() %>%
+        dplyr::select(!c(Date, Time)) %>%
+        pivot_longer(cols = !c(datetime, station_name),
+                     names_to = 'variable', values_to = 'value')
+      created_on <- now()
+      data_source <- 'shiny_app'
+      type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
+      # Create a Progress object
+      progress <- shiny::Progress$new()
+      # Make sure it closes when we exit this reactive, even if there's an error
+      on.exit(progress$close())
+      progress$set(message = "Загрузка", value = 0)
+      n <- nrow(df)
+      print(n)
+      for (i in 1:n) {
+        q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
+        print(q)
+        
+        progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
+        tryCatch({
+          dbExecute(con, q)
+        },
+        error = function(e) return(e)
+        )
+        
+      }
+      return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name))
     })
+    
+  })
   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(con = x)})
 }
 # Create Shiny app ----
