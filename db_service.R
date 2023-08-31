@@ -1,5 +1,8 @@
-library(dplyr)
+Sys.setlocale(category = "LC_ALL", locale = "Russian")
+library(tidyverse)
+library(dbplyr)
 library(lubridate)
+library(stringi)
 library(RPostgreSQL)
 
 mypaw <- {
@@ -25,8 +28,43 @@ q
 res <- dbGetQuery(con, q)
 
 
-rm <- "DELETE FROM field_data"
+st <- dbGetQuery(con, "SELECT * FROM field_data ORDER BY change DESC LIMIT 100")
+st
+
+rm <- paste0("DELETE FROM field_data")
+rm
 dbExecute(con, rm)
+
+  
+df <- read.weatherlink(filename = 'sample.txt', 
+                       station_name = 'Olmeskhyr')
+df$type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
+df <- df %>%
+  mutate(pres_mm = Bar * 0.75006150504341, 
+         WindDir = as.integer(factor(WindDir, ordered = T)), 
+         HiDir = as.integer(factor(HiDir, ordered = T)))
+
+# df <- df[1:5,]
+df <- df %>%
+  pivot_longer(cols = !c(DateTime, station_name, type),
+               names_to = 'variable', values_to = 'value')
+
+q <- gsub("[\r\n\t]", "", 
+          paste0(c("INSERT INTO field_data (station, datetime, variable, 
+                   value, type, change, source) VALUES ", 
+                   paste0("('", df$station_name,  "','", 
+                          df$DateTime,"','", 
+                          trimws(df$variable), "','", 
+                          df$value,"','", df$type,"','", 
+                          today(), "', 'shiny_app')", 
+                          collapse = ','), " ON CONFLICT DO NOTHING"), 
+                 collapse = ""))
+# q
+q <- gsub("\'NA\'", "NULL", q)
+res <- dbSendStatement(con, q)
+dbGetRowsAffected(res)
+dbGetQuery(con, "SELECT * FROM field_data")
+
 dbDisconnect(con)
 
 

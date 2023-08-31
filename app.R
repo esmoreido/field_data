@@ -7,6 +7,7 @@ library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
 
+
 # Define UI for data upload app ----
 ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
@@ -86,6 +87,8 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
 
 # Define server logic to read selected file ----
 server <- function(input, output, session) {
+  source('source/helpers_funs.R', local = T)
+  
   mypaw <- {
     "vnFkY9Vj"
   }
@@ -175,14 +178,19 @@ server <- function(input, output, session) {
         
         progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
         tryCatch({
-          dbExecute(con, q)
+          # dbExecute(con, q)
+          qry <- dbSendStatement(con, q)
         },
         error = function(e) return(e)
         )
         
       }
-      return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
-                   '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
+      # return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
+      #              '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
+      print(qry)
+      res <- dbGetRowsAffected(qry)
+      print(res)
+      return(paste("В таблицу добавлено ", res, " записей данных"))
     })
   })
   
@@ -208,7 +216,7 @@ server <- function(input, output, session) {
   
   plot_df <- reactive({
     req(input$pick_station, input$pick_var)
-    q <- paste0("SELECT datetime, station, variable, value FROM field_data WHERE variable IN (\'", 
+    q <- paste0("SELECT datetime, station, variable, change, value FROM field_data WHERE variable IN (\'", 
                 paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
                 paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
     print(q)
@@ -233,7 +241,7 @@ server <- function(input, output, session) {
     })
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = 'datetime', names_from = c('station', 'variable'), values_from = 'value'),
+        pivot_wider(id_cols = c('datetime', 'change'), names_from = c('station', 'variable'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
