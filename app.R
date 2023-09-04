@@ -8,23 +8,23 @@ library(RPostgreSQL)
 library(tidyverse)
 
 
-# Define UI for data upload app ----
+# Основной контейнер приложения ----
 ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
-                 # Метеостанции ----
+                 # Панель загрузки данных ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
 
-                            # App title ----
+                            # App title 
                             titlePanel("Загрузка файлов с метеостанций"),
                             
-                            # Sidebar layout with input and output definitions ----
+                            # Боковая панель ----
                             sidebarLayout(
                               
-                              # Добавление файла ----
+                              # Добавление файла 
                               sidebarPanel(
                                 
                                 selectInput("station_name", "Название метеостанции", 
@@ -33,11 +33,11 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                                         'Кизилкобинка' = 'Kizilkobinka', 
                                                         'Караби' = 'Karabi')), # 'Чатырдаг', 
                                 
-                                # Horizontal line ----
+                                # Horizontal line 
                                 tags$hr(),
                                 
                                 
-                                # Input: Select a file ----
+                                # Input: Select a file 
                                 fileInput("file1", "Выбрать файл",
                                           multiple = FALSE,
                                           accept = c("text/csv",
@@ -49,32 +49,33 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                               label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
                                               value = F
                                              ),
-                                # Horizontal line ----
+                                # Horizontal line 
                                 tags$hr(),
                                 
-                                # Insert button ----
+                                # Insert button 
                                 actionButton("insert_df", "Загрузить"),
                                 actionButton("reset1", "Очистить")
                                 
                               ),
                               
-                              # Main panel for displaying outputs ----
+                              # Основная панель таблицы ----
                               mainPanel(
                                 
-                                # Output: Data file ----
+                                # Вывод таблицы и результатов добавления ----
                                 dataTableOutput("contents"),
-                                h2(textOutput("qry"))
+                                h2(textOutput("qry", inline = T))
                               )
                               
                             )
                           )
                  ),
+                 # Панель графика ----
                  tabPanel(title = "Просмотр",
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
                             
-                            # App title ----
+                            # Заголовок
                             titlePanel("Просмотр данных"),
                             sidebarLayout(
                               sidebarPanel(
@@ -92,7 +93,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                           ))
 )
 
-# Define server logic to read selected file ----
+# Сервер ----
 server <- function(input, output, session) {
   source('source/helpers_funs.R', local = T)
   
@@ -100,23 +101,26 @@ server <- function(input, output, session) {
     "vnFkY9Vj"
   }
   drv <- dbDriver("PostgreSQL")
+  # Для панели загрузки данных из файлов ----
+  # Соединение с базой ----
   tryCatch({
     con <- dbConnect(drv, dbname = "hydromet",
                      host = "192.168.5.203", port = 5432,
                      user = "moreydo", password = mypaw)
     print('Connected')
   },
-  error = function(e) {
-    # return a safeError if a parsing error occurs
-    output$qry <- renderText("Error connecting to database!")
-    stop(safeError(e))
+    error = function(e){
+      stop(safeError(e))
+      output$qry <- renderText("Error connecting to database!")
   })
   rm(mypaw)
   
+  # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2), {
     shinyjs::js$refresh_page()
   }, ignoreNULL = T, ignoreInit = T)  
   
+  # Основная таблица данных ----
   input_df <- reactive({
     # input$file1 will be NULL initially. After the user selects
     # and uploads a file, head of that data file by default,
@@ -129,28 +133,23 @@ server <- function(input, output, session) {
     # having a comma separator causes `read.csv` to error
     tryCatch(
       {
-        df <- read.weatherlink()
+        df <- read.weatherlink() # Внешняя функция чтения файла Davis
       },
-      error = function(e) {
-        # return a safeError if a parsing error occurs
-        stop(safeError(e))
-      }
+      error = function(e) stop(safeError(e))
     )
   })
   
+  # Вывод таблицы с загруженным файлом для просмотра ----
   output$contents <- renderDataTable(
     input_df(), 
     options = list(pageLength = 10, 
                    language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
   )
   
+  # Загрузка по нажатию кнопки ----
   observeEvent(input$insert_df, {
     
     output$qry <- renderText({
-      # количество исходных строк
-      n_init <- nrow(input_df())
-      # количество исходных переменных как количество столбцов минус название, датавремя, дата, время
-      nvar <- ncol(input_df()) - 4
       df <- input_df() %>%
         # dplyr::select(!c(Date, Time)) %>%
         pivot_longer(cols = !c(DateTime, station_name),
@@ -162,11 +161,10 @@ server <- function(input, output, session) {
       progress <- shiny::Progress$new()
       # Make sure it closes when we exit this reactive, even if there's an error
       on.exit(progress$close())
-      progress$set(message = "Загрузка", value = 0)
+      # progress$set(message = "Загрузка", value = 0)
       n <- nrow(df)
       # print(n)
-      # for (i in 1:n) {
-        # q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
+      # for (i in 1:100) {
         q <- gsub("[\r\n\t]", "",
                   paste0(c("INSERT INTO field_data (station, datetime, variable,
                    value, type, change, source) VALUES ",
@@ -178,12 +176,11 @@ server <- function(input, output, session) {
                                   collapse = ','), " ON CONFLICT DO NOTHING"),
                          collapse = ""))
         q <- gsub("\'NA\'", "NULL", q)
-        print(q)
+        # print(q)
         
-        # progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
+        # progress$inc(i, detail = "Добавление записей в таблицу, подождите...")
         # tryCatch({
-          # dbExecute(con, q)
-        qry <- dbSendStatement(con, q)
+          qry <- dbSendStatement(con, q)
         # },
         # error = function(e) return(e)
         # )
@@ -193,10 +190,18 @@ server <- function(input, output, session) {
       #              '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
         res <- dbGetRowsAffected(qry)
         print(res)
-      return(paste("В таблицу добавлено ", res, " записей данных"))
+      if(res > 0){
+        return(paste("Для добавления подготовлено записей данных:", n , 
+                   ". В таблицу добавлено записей данных: ", 
+                   res, sep = "\n")) 
+      }else{
+        return("Новых данных для добавления \n в базу не обнаружено.")
+      }
     })
   })
   
+  # Для панели графики ---- 
+  # Получение из БД списка станций для загрузки ----
   output$ui_stations <- renderUI({
     st_list <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
     selectInput('pick_station',
@@ -204,6 +209,8 @@ server <- function(input, output, session) {
                 choices=st_list$station,
                 selected = NULL, multiple = TRUE)
   })
+  
+  # Получение из БД списка переменных ----
   output$ui_var <- renderUI({
     var <- dbGetQuery(con, "SELECT DISTINCT variable FROM field_data")
     pickerInput('pick_var',
@@ -217,13 +224,13 @@ server <- function(input, output, session) {
                 multiple = T)
   })
   
+  # Таблица для графика и вывода ----
   plot_df <- reactive({
     req(input$pick_station, input$pick_var)
     q <- paste0("SELECT datetime, station, variable, change, value FROM field_data WHERE variable IN (\'", 
                 paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
                 paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
-    print(q)
-    # q <- enc2utf8(q)
+    # print(q)
     tryCatch({
       df <- dbGetQuery(con, q)
     },
@@ -232,16 +239,18 @@ server <- function(input, output, session) {
     
   })
   
+  # График ----
   observeEvent(input$plot_graph, {
     output$plotdata <- renderPlot({
       withProgress(expr = {
         ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
           facet_wrap(variable~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
           scale_x_datetime(date_labels = "%d.%m.%y") +
-          # theme_light(base_size = 16) + 
+          theme_light(base_size = 16) +
           theme(legend.position = 'top') + 
           labs(x='Дата', y='', col='')}, message = "Загрузка...")
     })
+    # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
         pivot_wider(id_cols = c('datetime', 'change'), names_from = c('station', 'variable'), values_from = 'value'),
@@ -249,11 +258,11 @@ server <- function(input, output, session) {
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
   })
-  
+  # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
     lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
     print('Disconnected')
   })
 }
-# Create Shiny app ----
+# Выполнение приложения ----
 shinyApp(ui, server)

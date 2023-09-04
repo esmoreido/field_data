@@ -43,6 +43,10 @@ read.weatherlink <- function(){
       relocate(DateTime)
   }
   
+  # фильтр NA-дат 
+  df <- df %>%
+    filter(!is.na(DateTime))
+  
   # убираем лишние пробелы в названиях
   colnames(df) <- trimws(colnames(df))
   
