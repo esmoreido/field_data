@@ -35,9 +35,10 @@ rm <- paste0("DELETE FROM field_data")
 rm
 dbExecute(con, rm)
 
-  
+st_name <- "Ольмесхыр"
+source('source/helpers_funs.R')
 df <- read.weatherlink(filename = 'sample.txt', 
-                       station_name = 'Olmeskhyr')
+                       station_name = enc2utf8(st_name))
 df$type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
 df <- df %>%
   mutate(pres_mm = Bar * 0.75006150504341, 
@@ -49,17 +50,17 @@ df <- df %>%
   pivot_longer(cols = !c(DateTime, station_name, type),
                names_to = 'variable', values_to = 'value')
 
-q <- gsub("[\r\n\t]", "", 
-          paste0(c("INSERT INTO field_data (station, datetime, variable, 
-                   value, type, change, source) VALUES ", 
-                   paste0("('", df$station_name,  "','", 
-                          df$DateTime,"','", 
-                          trimws(df$variable), "','", 
-                          df$value,"','", df$type,"','", 
-                          today(), "', 'shiny_app')", 
-                          collapse = ','), " ON CONFLICT DO NOTHING"), 
+q <- gsub("[\r\n\t]", "",
+          paste0(c("INSERT INTO field_data (station, datetime, variable,
+                   value, type, change, source) VALUES ",
+                   paste0("('", df$station_name,  "','",
+                          df$DateTime,"','",
+                          trimws(df$variable), "','",
+                          df$value,"','", df$type,"','",
+                          today(), "', 'shiny_app')",
+                          collapse = ','), " ON CONFLICT DO NOTHING"),
                  collapse = ""))
-# q
+q
 q <- gsub("\'NA\'", "NULL", q)
 res <- dbSendStatement(con, q)
 dbGetRowsAffected(res)

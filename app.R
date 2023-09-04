@@ -28,7 +28,10 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               sidebarPanel(
                                 
                                 selectInput("station_name", "Название метеостанции", 
-                                            choices = c('Ольмесхыр', 'Многоречье', 'Кизилкобинка', 'Караби')), # 'Чатырдаг', 
+                                            choices = c('Ольмесхыр' = 'Olmeskhyr', 
+                                                        'Многоречье' = 'Mnogorechye', 
+                                                        'Кизилкобинка' = 'Kizilkobinka', 
+                                                        'Караби' = 'Karabi')), # 'Чатырдаг', 
                                 
                                 # Horizontal line ----
                                 tags$hr(),
@@ -42,6 +45,10 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                                      ".csv"),
                                           buttonLabel = "Выбрать...",
                                           placeholder = "Файл не выбран"),
+                                checkboxInput(inputId = "amdate", 
+                                              label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
+                                              value = F
+                                             ),
                                 # Horizontal line ----
                                 tags$hr(),
                                 
@@ -122,21 +129,7 @@ server <- function(input, output, session) {
     # having a comma separator causes `read.csv` to error
     tryCatch(
       {
-        df <- read.csv(input$file1$datapath, sep = '\t', header = F,
-                       check.names = F, stringsAsFactors = F,
-                       col.names = c("Date",	"Time",	"TempOut",	"HiTemp",	"LowTemp",	"OutHum",	"DewPt",	"WindSpeed",	"WindDir",	"WindRun",	"HiSpeed",	"HiDir",	"WindChill",	"HeatIndex",	"THWIndex",	"Bar",	"Rain",	"RainRate",	"HeatD-D",	"CoolD-D",	"InTemp",	"InHum",	"InDew",	"InHeat",	"InEMC",	"InAirDensity",	"WindSamp",	"WindTx ",	"ISSRecept",	"ArcInt"),
-                       skip = 2, na.strings = '---',
-                       colClasses = c('character', 'character', 
-                                      rep('numeric', 6), 'character', 'numeric', 'numeric', 'character', 
-                                      rep('numeric', 18)))
-        df <- df %>%
-          mutate(datetime = parse_date_time(paste(Date, Time), orders = "%d.%m.%y %H:%M", tz = 'GMT'),
-                 station_name = input$station_name) %>%
-          filter(!is.na(datetime)) %>%
-          relocate(station_name, datetime) %>%
-          mutate(pres_mm = Bar * 0.75006150504341, 
-                 WindDir = as.integer(factor(WindDir, ordered = T)), 
-                 HiDir = as.integer(factor(HiDir, ordered = T)))
+        df <- read.weatherlink()
       },
       error = function(e) {
         # return a safeError if a parsing error occurs
@@ -159,8 +152,8 @@ server <- function(input, output, session) {
       # количество исходных переменных как количество столбцов минус название, датавремя, дата, время
       nvar <- ncol(input_df()) - 4
       df <- input_df() %>%
-        dplyr::select(!c(Date, Time)) %>%
-        pivot_longer(cols = !c(datetime, station_name),
+        # dplyr::select(!c(Date, Time)) %>%
+        pivot_longer(cols = !c(DateTime, station_name),
                      names_to = 'variable', values_to = 'value')
       created_on <- now()
       data_source <- 'shiny_app'
@@ -172,24 +165,34 @@ server <- function(input, output, session) {
       progress$set(message = "Загрузка", value = 0)
       n <- nrow(df)
       # print(n)
-      for (i in 1:n) {
-        q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
-        # print(q)
+      # for (i in 1:n) {
+        # q <- paste0("INSERT INTO field_data (station, datetime, variable, value, type, change, source) VALUES ('", df$station_name[i],  "','", df$datetime[i],"','", trimws(df$variable[i]), "',", df$value[i],",", type,",'", created_on, "', '", data_source, "') ON CONFLICT DO NOTHING")
+        q <- gsub("[\r\n\t]", "",
+                  paste0(c("INSERT INTO field_data (station, datetime, variable,
+                   value, type, change, source) VALUES ",
+                           paste0("('", df$station_name,  "','",
+                                  df$DateTime,"','",
+                                  trimws(df$variable), "','",
+                                  df$value,"','", type,"','",
+                                  created_on, "', '", data_source, "')",
+                                  collapse = ','), " ON CONFLICT DO NOTHING"),
+                         collapse = ""))
+        q <- gsub("\'NA\'", "NULL", q)
+        print(q)
         
-        progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
-        tryCatch({
+        # progress$inc(1/n, detail = paste("Обрабатывается запись", i, " из ", n))
+        # tryCatch({
           # dbExecute(con, q)
-          qry <- dbSendStatement(con, q)
-        },
-        error = function(e) return(e)
-        )
+        qry <- dbSendStatement(con, q)
+        # },
+        # error = function(e) return(e)
+        # )
         
-      }
+      # }
       # return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
       #              '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
-      print(qry)
-      res <- dbGetRowsAffected(qry)
-      print(res)
+        res <- dbGetRowsAffected(qry)
+        print(res)
       return(paste("В таблицу добавлено ", res, " записей данных"))
     })
   })

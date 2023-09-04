@@ -9,11 +9,17 @@ library(readxl)
 library(writexl)
 library(gridExtra)
 
-read.weatherlink <- function(filename, station_name = paste('Метеостанция', today()), 
-                             graph_title = 'График измеренных метеовеличин', 
-                             date_breaks = '1 day', 
-                             minor_date_breaks = '1 hour',
-                             xls = F, baro = F, amdate = amdate, long = F){
+read.weatherlink <- function(){
+  filename = input$file1$datapath
+  station_name = input$station_name
+  graph_title = 'График измеренных метеовеличин' 
+  date_breaks = '1 day'
+  minor_date_breaks = '1 hour'
+  xls = F 
+  baro = F
+  amdate = input$amdate
+  print(amdate)
+  long = F
   # считываем данные
   df <- read.csv(filename, sep = '\t', header = F,
                  check.names = F, stringsAsFactors = F,
@@ -40,38 +46,16 @@ read.weatherlink <- function(filename, station_name = paste('Метеостан�
   # убираем лишние пробелы в названиях
   colnames(df) <- trimws(colnames(df))
   
-  # добавляем колонку с давлением в мм рт.ст.
+  # добавляем колонку с давлением в мм рт.ст., меняем номинальные переменные 
+  # на рациональные
   df <- df %>%
-    mutate(pres_mm = Bar * 0.75006150504341) 
+    mutate(pres_mm = Bar * 0.75006150504341, 
+           WindDir = as.integer(factor(WindDir, ordered = T)), 
+           HiDir = as.integer(factor(HiDir, ordered = T)))
   
   # убираем старые дату и время
   df$station_name <- station_name
   df <- dplyr::select(df, -c(Date, Time))
   
-  # экспорт в excel
-  if(xls == T){
-    write_xlsx(df, path = paste0(station_name, '.xlsx'))
-  }
-  # экспорт давления для барокомпенсации
-  if(baro == T){
-    baro_df <- df %>%
-      dplyr::select('DateTime', 'pres_mm') %>%
-      filter(!is.na(DateTime)) %>%
-      mutate(Date = format(date(DateTime), format = "%m/%d%/%y"),
-             Time = format(DateTime, format = "%H:%M:%S")) %>%
-      dplyr::select(Date, Time, pres_mm)
-    write.table(file = paste('baro', station_name,
-                             min(na.omit(date(df$DateTime))), 
-                             max(na.omit(date(df$DateTime))), 
-                             '.txt', sep = '_', collapse = '-'), 
-                quote = F, 
-                row.names = F, x = baro_df, sep = ',', 
-                col.names = c('Date', 'Time', 'pres (mm Hg)'))
-  }
-  
-  if(long == T){
-    df <- melt(df, id.vars = c('DateTime', 'station_name'))
-    df$datatype <- 'weather'
-  }
   return(df)
 } 
