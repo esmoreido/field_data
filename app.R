@@ -49,6 +49,14 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                               label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
                                               value = F
                                              ),
+                                checkboxInput(inputId = "amunit", 
+                                              label = "Американские единицы (°F, in.)", 
+                                              value = F
+                                ), 
+                                checkboxInput(inputId = "pres_mm", 
+                                                 label = "мБар в мм.рт.ст.", 
+                                                 value = F
+                                ),
                                 # Horizontal line 
                                 tags$hr(),
                                 
@@ -62,7 +70,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               mainPanel(
                                 
                                 # Вывод таблицы и результатов добавления ----
-                                dataTableOutput("contents"),
+                                div(dataTableOutput("contents"), style = "font-size:80%"),
                                 h2(textOutput("qry", inline = T))
                               )
                               
@@ -81,13 +89,17 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               sidebarPanel(
                                 uiOutput('ui_stations', ),
                                 uiOutput('ui_var'),
+                                selectInput("group", "Группировка", 
+                                            choices = c('Без группировки'='nogroup', 
+                                                        'По переменным'='group_var', 
+                                                        'По станциям'='group_stat')),
                                 actionButton("plot_graph", "Создать"),
                                 actionButton("reset2", "Очистить")
                               ),
                               mainPanel(
-                                div(style='overflow-y: scroll', 
+                                div(style='overflow: scroll', 
                                     plotOutput('plotdata')),
-                                dataTableOutput("datatable")
+                                div(dataTableOutput("datatable"), style = "font-size:80%")
                               )
                             )
                           ))
@@ -122,15 +134,10 @@ server <- function(input, output, session) {
   
   # Основная таблица данных ----
   input_df <- reactive({
-    # input$file1 will be NULL initially. After the user selects
-    # and uploads a file, head of that data file by default,
-    # or all rows if selected, will be shown.
-    
     req(input$file1)
     validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
                   "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"))
-    # when reading semicolon separated files,
-    # having a comma separator causes `read.csv` to error
+    
     tryCatch(
       {
         df <- read.weatherlink() # Внешняя функция чтения файла Davis
@@ -155,13 +162,9 @@ server <- function(input, output, session) {
         pivot_longer(cols = !c(DateTime, station_name),
                      names_to = 'variable', values_to = 'value')
       created_on <- now()
-      data_source <- 'shiny_app'
+      data_source <- input$file1$name
+      # print(data_source)
       type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
-      # Create a Progress object
-      progress <- shiny::Progress$new()
-      # Make sure it closes when we exit this reactive, even if there's an error
-      on.exit(progress$close())
-      # progress$set(message = "Загрузка", value = 0)
       n <- nrow(df)
       # print(n)
       # for (i in 1:100) {
@@ -176,18 +179,9 @@ server <- function(input, output, session) {
                                   collapse = ','), " ON CONFLICT DO NOTHING"),
                          collapse = ""))
         q <- gsub("\'NA\'", "NULL", q)
-        # print(q)
         
-        # progress$inc(i, detail = "Добавление записей в таблицу, подождите...")
-        # tryCatch({
-          qry <- dbSendStatement(con, q)
-        # },
-        # error = function(e) return(e)
-        # )
-        
-      # }
-      # return(paste("В таблицу добавлено ", n, " записей данных с метеостанции ", input$station_name, 
-      #              '(Количество исходных записей (', n_init, ') умноженное на число переменных (', nvar, ')'))
+        withProgress(expr = {
+          qry <- dbSendStatement(con, q)}, message = "Добавление записей в таблицу, подождите...")
         res <- dbGetRowsAffected(qry)
         print(res)
       if(res > 0){
@@ -227,7 +221,7 @@ server <- function(input, output, session) {
   # Таблица для графика и вывода ----
   plot_df <- reactive({
     req(input$pick_station, input$pick_var)
-    q <- paste0("SELECT datetime, station, variable, change, value FROM field_data WHERE variable IN (\'", 
+    q <- paste0("SELECT datetime, station, variable, change, source, value FROM field_data WHERE variable IN (\'", 
                 paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
                 paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
     # print(q)
@@ -243,24 +237,45 @@ server <- function(input, output, session) {
   observeEvent(input$plot_graph, {
     output$plotdata <- renderPlot({
       withProgress(expr = {
-        ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
-          facet_wrap(variable~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
-          scale_x_datetime(date_labels = "%d.%m.%y") +
-          theme_light(base_size = 16) +
-          theme(legend.position = 'top') + 
-          labs(x='Дата', y='', col='')}, message = "Загрузка...")
+        switch(input$group, 
+               nogroup = {
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
+                   facet_wrap(variable~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   scale_x_datetime(date_labels = "%d.%m.%y") +
+                   theme_light(base_size = 16) +
+                   theme(legend.position = 'top') + 
+                   labs(x='Дата', y='', col='')
+                 },
+               group_var = {
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
+                   facet_wrap(.~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   scale_x_datetime(date_labels = "%d.%m.%y") +
+                   theme_light(base_size = 16) +
+                   theme(legend.position = 'top') + 
+                   labs(x='Дата', y='', col='')
+               },
+               group_stat = {
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=station)) + geom_line() +
+                   facet_wrap(.~variable, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   scale_x_datetime(date_labels = "%d.%m.%y") +
+                   theme_light(base_size = 16) +
+                   theme(legend.position = 'top') + 
+                   labs(x='Дата', y='', col='')
+               }
+        )}, message = "Загрузка...")
     })
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = c('datetime', 'change'), names_from = c('station', 'variable'), values_from = 'value'),
+        pivot_wider(id_cols = c('datetime', 'change', 'source'), names_from = c('station', 'variable'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
   })
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
-    lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
+  #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
+    dbDisconnect(con)
     print('Disconnected')
   })
 }

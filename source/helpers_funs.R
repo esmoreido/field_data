@@ -15,6 +15,8 @@ read.weatherlink <- function(){
   xls = F 
   baro = F
   amdate = input$amdate
+  amunit = input$amunit
+  pres_mm = input$pres_mm
   print(amdate)
   long = F
   # считываем данные
@@ -47,11 +49,29 @@ read.weatherlink <- function(){
   # убираем лишние пробелы в названиях
   colnames(df) <- trimws(colnames(df))
   
-  # добавляем колонку с давлением в мм рт.ст., меняем номинальные переменные 
-  # на рациональные
+  # переводим из американских единиц в СИ
+  if(amunit == T){
+    df <- df %>%
+      mutate(across(contains(c('Temp', 'Dew', 'Chill', 'Heat', 'Index')), 
+                    ~ round((.x - 32)/1.8, 1)), .keep=c("unused"))
+    df <- df %>%
+      mutate(across(contains(c('Rain', 'Bar')), ~ .x * 25.4), .keep=c("unused"))
+    if(pres_mm == T){
+      df <- df %>%
+        mutate(pres_mm = Bar)
+    }
+  }else{
+    if(pres_mm == T){
+      df <- df %>%
+        mutate(pres_mm = Bar * 0.75006150504341)
+    }
+  }
+  
+  
+  
+  # меняем номинальные переменные на рациональные
   df <- df %>%
-    mutate(pres_mm = Bar * 0.75006150504341, 
-           WindDir = as.integer(factor(WindDir, ordered = T)), 
+    mutate(WindDir = as.integer(factor(WindDir, ordered = T)), 
            HiDir = as.integer(factor(HiDir, ordered = T)))
   
   # убираем старые дату и время
