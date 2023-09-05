@@ -1,6 +1,5 @@
 Sys.setlocale(category = "LC_ALL", locale = "Russian")
 library(ggplot2)
-library(ggthemes)
 library(lubridate)
 library(reshape2)
 library(tidyverse)
