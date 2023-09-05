@@ -4,8 +4,6 @@ library(lubridate)
 library(reshape2)
 # library(tidyverse)
 # library(dplyr)
-library(readxl)
-library(writexl)
 library(gridExtra)
 
 read.weatherlink <- function(){
