@@ -1,6 +1,7 @@
 library(shiny)
 # library(shinyjs)
 library(shinyWidgets)
+library(stringi)
 library(dplyr)
 library(ggplot2)
 library(lubridate)
@@ -27,15 +28,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               # Добавление файла 
                               sidebarPanel(
                                 
-                                selectInput("station_name", "Название метеостанции", 
-                                            choices = c('Ольмесхыр' = 'Olmeskhyr', 
-                                                        'Многоречье' = 'Mnogorechye', 
-                                                        'Кизилкобинка' = 'Kizilkobinka', 
-                                                        'Караби' = 'Karabi')), # 'Чатырдаг', 
-                                
-                                # Horizontal line 
-                                tags$hr(),
-                                
+                                uiOutput('ui_st_import'),
                                 
                                 # Input: Select a file 
                                 fileInput("file1", "Выбрать файл",
@@ -87,7 +80,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                             titlePanel("Просмотр данных"),
                             sidebarLayout(
                               sidebarPanel(
-                                uiOutput('ui_stations', ),
+                                uiOutput('ui_stations'),
                                 uiOutput('ui_var'),
                                 selectInput("group", "Группировка", 
                                             choices = c('Без группировки'='nogroup', 
@@ -104,6 +97,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                             )
                           ))
 )
+
 
 # Сервер ----
 server <- function(input, output, session) {
@@ -131,6 +125,15 @@ server <- function(input, output, session) {
   observeEvent(c(input$reset1,input$reset2), {
     shinyjs::js$refresh_page()
   }, ignoreNULL = T, ignoreInit = T)  
+  
+  # Получение из БД списка метеостанций для добавления в таблицу ----
+  output$ui_st_import <- renderUI({
+    st_list <- dbGetQuery(con, "SELECT DISTINCT name FROM field_site WHERE type = 1")
+    selectInput('station_name',
+                label ='Метеостанции',
+                choices=st_list$name,
+                selected = NULL, multiple = F)
+  })
   
   # Основная таблица данных ----
   input_df <- reactive({
@@ -195,12 +198,12 @@ server <- function(input, output, session) {
   })
   
   # Для панели графики ---- 
-  # Получение из БД списка станций для загрузки ----
+  # Получение из БД списка метеостанций для графики ----
   output$ui_stations <- renderUI({
-    st_list <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
+    st_list <- dbGetQuery(con, "SELECT DISTINCT name FROM field_site WHERE type = 1")
     selectInput('pick_station',
                 label ='Метеостанции',
-                choices=st_list$station,
+                choices=st_list$name,
                 selected = NULL, multiple = TRUE)
   })
   
@@ -224,7 +227,7 @@ server <- function(input, output, session) {
     q <- paste0("SELECT datetime, station, variable, change, source, value FROM field_data WHERE variable IN (\'", 
                 paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
                 paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
-    # print(q)
+    print(q)
     tryCatch({
       df <- dbGetQuery(con, q)
     },
@@ -278,6 +281,7 @@ server <- function(input, output, session) {
     dbDisconnect(con)
     print('Disconnected')
   })
+  
 }
 # Выполнение приложения ----
 shinyApp(ui, server)

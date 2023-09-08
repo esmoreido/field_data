@@ -1,4 +1,4 @@
-Sys.setlocale(category = "LC_ALL", locale = "Russian")
+Sys.setlocale(category = "LC_ALL", locale = "ru_RU.UTF-8")
 library(tidyverse)
 library(dbplyr)
 library(lubridate)
@@ -65,6 +65,30 @@ q <- gsub("\'NA\'", "NULL", q)
 res <- dbSendStatement(con, q)
 dbGetRowsAffected(res)
 dbGetQuery(con, "SELECT * FROM field_data")
+
+
+dbListFields(con, "field_site")
+library(sf)
+meteo <- st_read('D:/YandexDisk/ИВПРАН/крым/данные/метеостанции/iwp_meteostation.shp', 
+                 crs = 4326, options = "ENCODING=UTF-8")
+
+q <- paste0("INSERT INTO field_site (name, type, lon, lat) VALUES ('", 
+            paste(meteo$name, '1', meteo$lon, meteo$lat, sep = "','", collapse = "'), ('"), "') ON CONFLICT DO NOTHING")
+q
+qry <- dbSendQuery(con, q)
+dbGetRowsAffected(qry)
+dbGetQuery(con, "SELECT * FROM field_site")
+
+hydro <- st_read('D:/YandexDisk/ИВПРАН/крым/данные/логгеры/iwp_loggers.shp', crs = 4326)
+hydro <- hydro %>%
+  mutate(namefull = paste(Watobj, Site, sep = ', '))
+q <- paste0("INSERT INTO field_site (name, type, lon, lat) VALUES ('", 
+            paste(hydro$namefull, '2', hydro$lon, hydro$lat, sep = "','", collapse = "'), ('"), "') ON CONFLICT DO NOTHING")
+q
+qry <- dbSendQuery(con, q)
+dbGetRowsAffected(qry)
+dbGetQuery(con, "SELECT * FROM field_site")
+
 
 dbDisconnect(con)
 
