@@ -13,6 +13,18 @@ library(tidyverse)
 ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
+                 # Панель перечня станций и постов ----
+                 tabPanel(title = "Станции",
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            
+                            # App title 
+                            titlePanel("Перечень станций и постов"),
+                    
+                              
+                          
+                 )),
                  # Панель загрузки данных ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
@@ -101,7 +113,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
 
 # Сервер ----
 server <- function(input, output, session) {
-  source('source/helpers_funs.R', local = T)
+  source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
   mypaw <- {
     "vnFkY9Vj"
@@ -127,13 +139,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Получение из БД списка метеостанций для добавления в таблицу ----
-  output$ui_st_import <- renderUI({
-    st_list <- dbGetQuery(con, "SELECT DISTINCT name FROM field_site WHERE type = 1")
-    selectInput('station_name',
-                label ='Метеостанции',
-                choices=st_list$name,
-                selected = NULL, multiple = F)
-  })
+  output$ui_st_import <- get_weather_station_list_selectInput()
   
   # Основная таблица данных ----
   input_df <- reactive({

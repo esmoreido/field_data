@@ -80,3 +80,17 @@ read.weatherlink <- function(){
   
   return(df)
 } 
+
+# Получение из БД списка метеостанций для добавления в таблицу ----
+get_weather_station_list_selectInput <- function(){
+  renderUI({
+  st_list <- dbGetQuery(con, "SELECT DISTINCT name, id FROM field_site WHERE type = 1")
+  st_choice <- as.list(st_list$id)
+  names(st_choice) <- st_list$name
+  selectInput('station_name',
+              label = enc2native('Метеостанции'),
+              # choices=st_list$name,
+              choices = st_choice,
+              selected = NULL, multiple = F)
+})
+}

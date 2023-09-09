@@ -68,6 +68,10 @@ dbGetQuery(con, "SELECT * FROM field_data")
 
 
 dbListFields(con, "field_site")
+
+df <- dbGetQuery(con, "SELECT * FROM field_site WHERE type = 1")
+paste0("'", paste(df$name, df$id, sep = "' = '", collapse = "', '"), "'")
+
 library(sf)
 meteo <- st_read('D:/YandexDisk/ИВПРАН/крым/данные/метеостанции/iwp_meteostation.shp', 
                  crs = 4326, options = "ENCODING=UTF-8")
