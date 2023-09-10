@@ -2,8 +2,7 @@ Sys.setlocale(category = "LC_ALL", locale = "Russian")
 library(ggplot2)
 library(lubridate)
 library(reshape2)
-# library(tidyverse)
-# library(dplyr)
+library(RPostgreSQL)
 library(gridExtra)
 
 read.weatherlink <- function(){
@@ -82,15 +81,34 @@ read.weatherlink <- function(){
 } 
 
 # Получение из БД списка метеостанций для добавления в таблицу ----
-get_weather_station_list_selectInput <- function(){
+get_weather_station_list_selectInput <- function(st_type = 1){
   renderUI({
-  st_list <- dbGetQuery(con, "SELECT DISTINCT name, id FROM field_site WHERE type = 1")
-  st_choice <- as.list(st_list$id)
-  names(st_choice) <- st_list$name
-  selectInput('station_name',
-              label = enc2native('Метеостанции'),
-              # choices=st_list$name,
-              choices = st_choice,
-              selected = NULL, multiple = F)
-})
+    q <- paste0("SELECT DISTINCT name, id FROM field_site WHERE type = ", st_type)
+    st_list <- dbGetQuery(con, q)
+    st_choice <- as.list(st_list$id)
+    names(st_choice) <- st_list$name
+    selectInput('station_id',
+                label = enc2native('Метеостанции'),
+                choices = st_choice,
+                selected = NULL, multiple = F)
+  })
+}
+
+db_connect <- function(){
+  mypaw <- {
+    "vnFkY9Vj"
+  }
+  drv <- dbDriver("PostgreSQL")
+  tryCatch({
+    con <- dbConnect(drv, dbname = "hydromet",
+                     host = "192.168.5.203", port = 5432,
+                     user = "moreydo", password = mypaw) # заменить на новый логин и пароль для приложения
+    print('Connected')
+  },
+  error = function(e){
+    stop(safeError(e))
+    output$qry <- renderText("Ошибка соединения с базой!")
+  })
+  rm(mypaw)
+  return(con)
 }

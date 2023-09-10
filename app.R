@@ -115,23 +115,24 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
 server <- function(input, output, session) {
   source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
-  mypaw <- {
-    "vnFkY9Vj"
-  }
-  drv <- dbDriver("PostgreSQL")
+  # mypaw <- {
+  #   "vnFkY9Vj"
+  # }
+  # drv <- dbDriver("PostgreSQL")
   # Для панели загрузки данных из файлов ----
   # Соединение с базой ----
-  tryCatch({
-    con <- dbConnect(drv, dbname = "hydromet",
-                     host = "192.168.5.203", port = 5432,
-                     user = "moreydo", password = mypaw)
-    print('Connected')
-  },
-    error = function(e){
-      stop(safeError(e))
-      output$qry <- renderText("Error connecting to database!")
-  })
-  rm(mypaw)
+  con <- db_connect()
+  # tryCatch({
+  #   con <- dbConnect(drv, dbname = "hydromet",
+  #                    host = "192.168.5.203", port = 5432,
+  #                    user = "moreydo", password = mypaw)
+  #   print('Connected')
+  # },
+  #   error = function(e){
+  #     stop(safeError(e))
+  #     output$qry <- renderText("Error connecting to database!")
+  # })
+  # rm(mypaw)
   
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2), {
@@ -139,7 +140,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Получение из БД списка метеостанций для добавления в таблицу ----
-  output$ui_st_import <- get_weather_station_list_selectInput()
+  output$ui_st_import <- get_weather_station_list_selectInput(1)
   
   # Основная таблица данных ----
   input_df <- reactive({
@@ -205,13 +206,7 @@ server <- function(input, output, session) {
   
   # Для панели графики ---- 
   # Получение из БД списка метеостанций для графики ----
-  output$ui_stations <- renderUI({
-    st_list <- dbGetQuery(con, "SELECT DISTINCT name FROM field_site WHERE type = 1")
-    selectInput('pick_station',
-                label ='Метеостанции',
-                choices=st_list$name,
-                selected = NULL, multiple = TRUE)
-  })
+  output$ui_stations <- get_weather_station_list_selectInput(1)
   
   # Получение из БД списка переменных ----
   output$ui_var <- renderUI({
