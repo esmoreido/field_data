@@ -45,11 +45,12 @@ df <- df %>%
          WindDir = as.integer(factor(WindDir, ordered = T)), 
          HiDir = as.integer(factor(HiDir, ordered = T)))
 
-# df <- df[1:5,]
+
 df <- df %>%
   pivot_longer(cols = !c(DateTime, station_name, type),
                names_to = 'variable', values_to = 'value')
 
+# запрос на добавление данных из файлов
 q <- gsub("[\r\n\t]", "",
           paste0(c("INSERT INTO field_data (station, datetime, variable,
                    value, type, change, source) VALUES ",
@@ -72,6 +73,7 @@ dbListFields(con, "field_site")
 df <- dbGetQuery(con, "SELECT * FROM field_site WHERE type = 1")
 paste0("'", paste(df$name, df$id, sep = "' = '", collapse = "', '"), "'")
 
+# загрузка информации по логгерам
 library(sf)
 meteo <- st_read('D:/YandexDisk/ИВПРАН/крым/данные/метеостанции/iwp_meteostation.shp', 
                  crs = 4326, options = "ENCODING=UTF-8")

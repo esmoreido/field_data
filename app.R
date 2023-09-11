@@ -7,6 +7,7 @@ library(ggplot2)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
+library(leaflet)
 
 
 # Основной контейнер приложения ----
@@ -18,13 +19,18 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            
-                            # App title 
-                            titlePanel("Перечень станций и постов"),
+                              verticalLayout(
+                                titlePanel("Расположение объектов наблюдательной сети"),
+                                leafletOutput("stations_map"),
+                                wellPanel(
+                                  dataTableOutput("stations_table")
+                                )
+                              )
+                            )
                     
                               
                           
-                 )),
+                 ),
                  # Панель загрузки данных ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
@@ -115,24 +121,8 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
 server <- function(input, output, session) {
   source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
-  # mypaw <- {
-  #   "vnFkY9Vj"
-  # }
-  # drv <- dbDriver("PostgreSQL")
-  # Для панели загрузки данных из файлов ----
-  # Соединение с базой ----
+  # соединение с БД
   con <- db_connect()
-  # tryCatch({
-  #   con <- dbConnect(drv, dbname = "hydromet",
-  #                    host = "192.168.5.203", port = 5432,
-  #                    user = "moreydo", password = mypaw)
-  #   print('Connected')
-  # },
-  #   error = function(e){
-  #     stop(safeError(e))
-  #     output$qry <- renderText("Error connecting to database!")
-  # })
-  # rm(mypaw)
   
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2), {
@@ -276,12 +266,38 @@ server <- function(input, output, session) {
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
   })
+  
+  # Карта ----
+  stations_df <- reactive({
+    pts <- dbGetQuery(con, "SELECT * FROM field_site")
+    print(pts)
+    return(pts)
+  })
+  
+  output$stations_table <- renderDataTable(stations_df(), 
+                                           options = list(pageLength = 10,
+                                                        language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+  output$stations_map <- renderLeaflet({
+    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+    leaflet(stations_df()) %>%
+      addTiles() %>%
+      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+                       label = ~name, labelOptions = labelOptions(noHide = T), 
+                       fillColor = ~typepal(type), 
+                       stroke = F, 
+                       clusterOptions = markerClusterOptions()) %>%
+      addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
+                labels = c('Метеостанции', 'Гидропосты'))
+  })
+  
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
   #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
     dbDisconnect(con)
     print('Disconnected')
   })
+  
+  
   
 }
 # Выполнение приложения ----
