@@ -7,7 +7,7 @@ library(ggplot2)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
-library(leaflet)
+# library(leaflet)
 
 
 # Основной контейнер приложения ----
@@ -247,18 +247,18 @@ server <- function(input, output, session) {
   output$stations_table <- renderDataTable(stations_df(), 
                                            options = list(pageLength = 25,
                                                           language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
-  output$stations_map <- renderLeaflet({
-    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
-    leaflet(stations_df()) %>%
-      addTiles() %>%
-      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-                       label = ~name, labelOptions = labelOptions(noHide = T), 
-                       fillColor = ~typepal(type), 
-                       stroke = F, 
-                       clusterOptions = markerClusterOptions()) %>%
-      addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
-                labels = c('Метеостанции', 'Гидропосты'))
-  })
+  # output$stations_map <- renderLeaflet({
+  #   typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+  #   leaflet(stations_df()) %>%
+  #     addTiles() %>%
+  #     addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+  #                      label = ~name, labelOptions = labelOptions(noHide = T), 
+  #                      fillColor = ~typepal(type), 
+  #                      stroke = F, 
+  #                      clusterOptions = markerClusterOptions()) %>%
+  #     addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
+  #               labels = c('Метеостанции', 'Гидропосты'))
+  # })
   
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
