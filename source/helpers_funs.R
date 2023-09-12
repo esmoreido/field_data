@@ -177,11 +177,11 @@ db_insert_weather <- function(){
 # запрос на данные для графики ----
 get_plot_vars <- function(){
   renderUI({
-    var <- dbGetQuery(con, "SELECT var_names FROM field_var_unit")
+    var <- dbGetQuery(con, "SELECT var_name FROM field_var_unit")
     # print(var)
     pickerInput('pick_var',
                 label ='Данные по оси X',
-                choices=var$var_names,
+                choices=var$var_name,
                 selected = NULL, 
                 options = list(`actions-box` = TRUE,
                                `deselect-all-text` = "Отменить",
