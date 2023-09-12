@@ -1,0 +1,16 @@
+CREATE SEQUENCE field_var_unit_id_seq;
+CREATE TABLE public.field_var_unit
+(
+  id bigint NOT NULL DEFAULT nextval('field_var_unit_id_seq'::regclass),
+  var_name text,
+  var_unit_en text,
+  var_unit_ru text,
+  var_type text,  
+  var_use integer
+)
+WITH (
+  OIDS=FALSE
+);
+ALTER TABLE public.field_var_unit
+  OWNER TO postgres;
+GRANT ALL ON TABLE public.field_var_unit TO postgres;

@@ -14,29 +14,12 @@ library(leaflet)
 ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
-                 # Панель перечня станций и постов ----
-                 tabPanel(title = "Станции",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                              verticalLayout(
-                                titlePanel("Расположение объектов наблюдательной сети"),
-                                leafletOutput("stations_map"),
-                                wellPanel(
-                                  dataTableOutput("stations_table")
-                                )
-                              )
-                            )
-                    
-                              
-                          
-                 ),
                  # Панель загрузки данных ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-
+                            
                             # App title 
                             titlePanel("Загрузка файлов с метеостанций"),
                             
@@ -59,14 +42,18 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                 checkboxInput(inputId = "amdate", 
                                               label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
                                               value = F
-                                             ),
+                                ),
                                 checkboxInput(inputId = "amunit", 
                                               label = "Американские единицы (°F, in.)", 
                                               value = F
                                 ), 
                                 checkboxInput(inputId = "pres_mm", 
-                                                 label = "мБар в мм.рт.ст.", 
-                                                 value = F
+                                              label = "мБар в мм.рт.ст.", 
+                                              value = F
+                                ),
+                                checkboxInput(inputId = "soil_data", 
+                                              label = "Есть температура и влажность почвы", 
+                                              value = F
                                 ),
                                 # Horizontal line 
                                 tags$hr(),
@@ -113,7 +100,26 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                 div(dataTableOutput("datatable"), style = "font-size:80%")
                               )
                             )
-                          ))
+                          )
+                 ),
+                 
+                 # Панель перечня станций и постов ----
+                 tabPanel(title = "Станции",
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            verticalLayout(
+                              titlePanel("Расположение объектов наблюдательной сети"),
+                              # leafletOutput("stations_map"),
+                              wellPanel(
+                                div(dataTableOutput("stations"), style = "font-size:80%")
+                              )
+                            )
+                          )
+                          
+                          
+                          
+                 ),
 )
 
 
@@ -130,7 +136,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Получение из БД списка метеостанций для добавления в таблицу ----
-  output$ui_st_import <- get_weather_station_list_selectInput(1)
+  output$ui_st_import <- get_weather_station_list_selectInput(1, F)
   
   # Основная таблица данных ----
   input_df <- reactive({
@@ -156,75 +162,39 @@ server <- function(input, output, session) {
   # Загрузка по нажатию кнопки ----
   observeEvent(input$insert_df, {
     
-    output$qry <- renderText({
-      df <- input_df() %>%
-        # dplyr::select(!c(Date, Time)) %>%
-        pivot_longer(cols = !c(DateTime, station_name),
-                     names_to = 'variable', values_to = 'value')
-      created_on <- now()
-      data_source <- input$file1$name
-      # print(data_source)
-      type <- '1' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
-      n <- nrow(df)
-      # print(n)
-      # for (i in 1:100) {
-        q <- gsub("[\r\n\t]", "",
-                  paste0(c("INSERT INTO field_data (station, datetime, variable,
-                   value, type, change, source) VALUES ",
-                           paste0("('", df$station_name,  "','",
-                                  df$DateTime,"','",
-                                  trimws(df$variable), "','",
-                                  df$value,"','", type,"','",
-                                  created_on, "', '", data_source, "')",
-                                  collapse = ','), " ON CONFLICT DO NOTHING"),
-                         collapse = ""))
-        q <- gsub("\'NA\'", "NULL", q)
-        
-        withProgress(expr = {
-          qry <- dbSendStatement(con, q)}, message = "Добавление записей в таблицу, подождите...")
-        res <- dbGetRowsAffected(qry)
-        print(res)
-      if(res > 0){
-        return(paste("Для добавления подготовлено записей данных:", n , 
-                   ". В таблицу добавлено записей данных: ", 
-                   res, sep = "\n")) 
-      }else{
-        return("Новых данных для добавления \n в базу не обнаружено.")
-      }
-    })
+    output$qry <- db_insert_weather()
+    
   })
   
   # Для панели графики ---- 
-  # Получение из БД списка метеостанций для графики ----
-  output$ui_stations <- get_weather_station_list_selectInput(1)
+  # Получение из БД списка станций для графики ----
+  output$ui_stations <- get_weather_station_list_selectInput(NULL, T)
   
   # Получение из БД списка переменных ----
-  output$ui_var <- renderUI({
-    var <- dbGetQuery(con, "SELECT DISTINCT variable FROM field_data")
-    pickerInput('pick_var',
-                label ='Данные по оси X',
-                choices=var$variable,
-                selected = NULL, 
-                options = list(`actions-box` = TRUE,
-                               `deselect-all-text` = "Отменить",
-                               `select-all-text` = "Выбрать всё",
-                               `none-selected-text` = "Выберите..."), 
-                multiple = T)
-  })
+  output$ui_var <- get_plot_vars()
   
   # Таблица для графика и вывода ----
   plot_df <- reactive({
-    req(input$pick_station, input$pick_var)
-    q <- paste0("SELECT datetime, station, variable, change, source, value FROM field_data WHERE variable IN (\'", 
-                paste0(input$pick_var, collapse = '\', \''), "\') AND station IN ('",
-                paste0(input$pick_station, collapse = '\', \''),"')  ORDER BY datetime")
+    req(input$station_id, input$pick_var)
+    q <- gsub("[\r\n\t]", "", 
+              paste0("SELECT field_data.datetime, field_site.name, 
+                field_data.variable, field_data.change, field_data.source, 
+                field_data.value 
+                       FROM field_data 
+                       LEFT JOIN field_site
+                       ON field_data.station::integer=field_site.id
+                       WHERE field_data.variable IN (\'", 
+                     paste0(input$pick_var, collapse = '\', \''), "\') 
+                AND field_data.station IN ('",
+                     paste0(input$station_id, collapse = '\', \''),"')  ORDER BY datetime")
+    )
     print(q)
     tryCatch({
       df <- dbGetQuery(con, q)
     },
     error = function(e) return(e)
     )
-    
+    return(df)
   })
   
   # График ----
@@ -234,22 +204,22 @@ server <- function(input, output, session) {
         switch(input$group, 
                nogroup = {
                  ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
-                   facet_wrap(variable~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   facet_wrap(variable~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
                    theme(legend.position = 'top') + 
                    labs(x='Дата', y='', col='')
-                 },
+               },
                group_var = {
                  ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
-                   facet_wrap(.~station, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   facet_wrap(.~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
                    theme(legend.position = 'top') + 
                    labs(x='Дата', y='', col='')
                },
                group_stat = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=station)) + geom_line() +
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=name)) + geom_line() +
                    facet_wrap(.~variable, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
@@ -261,7 +231,7 @@ server <- function(input, output, session) {
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = c('datetime', 'change', 'source'), names_from = c('station', 'variable'), values_from = 'value'),
+        pivot_wider(id_cols = c('datetime', 'change', 'source'), names_from = c('name', 'variable'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
@@ -270,13 +240,13 @@ server <- function(input, output, session) {
   # Карта ----
   stations_df <- reactive({
     pts <- dbGetQuery(con, "SELECT * FROM field_site")
-    print(pts)
+    # print(pts)
     return(pts)
   })
   
   output$stations_table <- renderDataTable(stations_df(), 
-                                           options = list(pageLength = 10,
-                                                        language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+                                           options = list(pageLength = 25,
+                                                          language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   output$stations_map <- renderLeaflet({
     typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
     leaflet(stations_df()) %>%
@@ -292,7 +262,7 @@ server <- function(input, output, session) {
   
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
-  #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
+    #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
     dbDisconnect(con)
     print('Disconnected')
   })
