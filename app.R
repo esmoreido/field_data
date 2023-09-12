@@ -112,7 +112,7 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               titlePanel("Расположение объектов наблюдательной сети"),
                               # leafletOutput("stations_map"),
                               wellPanel(
-                                div(dataTableOutput("stations"), style = "font-size:80%")
+                                div(dataTableOutput("stations_table"), style = "font-size:80%")
                               )
                             )
                           )
