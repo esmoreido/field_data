@@ -7,7 +7,7 @@ library(ggplot2)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
-library(leaflet)
+# library(leaflet)
 
 
 # Основной контейнер приложения ----
