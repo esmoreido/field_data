@@ -84,6 +84,7 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                                         'По станциям'='group_stat'))),
                                 div(style = "display:block;", 
                                     actionButton("plot_graph", "Создать"),
+                                    downloadButton('download',"Скачать таблицу"),
                                 actionButton("reset2", "Очистить"))
                               ),
                               wellPanel(
@@ -193,7 +194,7 @@ server <- function(input, output, session) {
     print(input$ui_stations)
     q <- gsub("[\r\n\t]", "", 
               paste0("SELECT field_data.datetime, field_site.name, 
-                field_data.variable, field_data.change, field_data.source, 
+                field_data.variable, field_data.source, 
                 field_data.value 
                        FROM field_data 
                        LEFT JOIN field_site
@@ -246,12 +247,18 @@ server <- function(input, output, session) {
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = c('datetime', 'change', 'source'), names_from = c('name', 'variable'), values_from = 'value'),
+        pivot_wider(id_cols = c('datetime', 'source'), names_from = c('name', 'variable'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
   })
-  
+  # Файл для скачивания ----
+  output$download <- downloadHandler(
+    filename = function(){"krymdata_output.csv"}, 
+    content = function(fname){
+      write.csv(plot_df(), fname, sep = ";", quote = F, row.names = F, na = '-32968')
+    }
+  )
   # Карта и таблица станций ----
   stations_df <- reactive({
     q <- gsub("[\r\n\t]", "", 
