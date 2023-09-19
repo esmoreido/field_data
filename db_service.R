@@ -1,17 +1,17 @@
-Sys.setlocale(category = "LC_ALL", locale = "ru_RU.UTF-8")
+Sys.setlocale(category = "LC_ALL", locale = "russian")
 library(tidyverse)
 library(dbplyr)
 library(lubridate)
 library(stringi)
 library(RPostgreSQL)
-
+# соединение ----
 mypaw <- {
-  "vnFkY9Vj"
+  "8IktF3go"
 }
 drv <- dbDriver("PostgreSQL")
 con <- dbConnect(drv, dbname = "hydromet",
                    host = "192.168.5.203", port = 5432,
-                   user = "moreydo", password = mypaw)
+                   user = "shiny_app", password = mypaw)
 rm(mypaw)
 dbListTables(con)
 dbListFields(con, 'field_site')
@@ -65,8 +65,9 @@ q
 q <- gsub("\'NA\'", "NULL", q)
 res <- dbSendStatement(con, q)
 dbGetRowsAffected(res)
-df <- dbGetQuery(con, "SELECT * FROM field_data")
+df <- dbGetQuery(con, "SELECT * FROM gmvo_data WHERE index IN (70001,70002,70004,70007,70011,70842) AND variable_id = 2")
 
+ggplot(df, aes(x=date, y=value, col=factor(index))) + geom_line()
 
 dbListFields(con, "field_site")
 
@@ -95,6 +96,12 @@ qry <- dbSendQuery(con, q)
 dbGetRowsAffected(qry)
 dbGetQuery(con, "SELECT * FROM field_device")
 
+
+# загрузка мета информации по устройствам ----
+
+q <- "INSERT INTO field_device_type (id, type) VALUES (1, 'Метеостанция'), (2, 'Гидропост')"
+dbExecute(con, enc2utf8(q))
+dbGetQuery(con, "SELECT * FROM field_device_type")
 
 # загрузка мета информации по переменным ----
 var_names <- c("Temp_Out", "Hi_Temp", "Low_Temp", "Out_Hum", "Dew_Pt", 
@@ -154,6 +161,21 @@ ggplot(df, aes(x = datetime, y = value, col=variable)) + geom_line() +
   theme_light(base_size = 16) +
   theme(legend.position = 'top') + 
   labs(x='Дата', y='', col='')
+
+# запросы на удаление по дате и источнику ----
+dbListFields(con, 'field_data')
+q <- gsub("[\r\n\t]", "", 
+          "SELECT DISTINCT field_data.change, field_data.source, field_site.name, 
+          count(value) as nval
+      FROM field_data  
+      LEFT JOIN field_site ON field_data.station::integer=field_site.id  
+      GROUP BY field_data.change, field_data.source, field_site.name
+      ORDER BY field_data.change")
+q
+df <- dbGetQuery(con, q)
+
+
+# разъединение ----
 dbDisconnect(con)
 
 

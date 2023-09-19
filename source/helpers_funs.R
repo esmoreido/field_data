@@ -104,10 +104,50 @@ get_weather_station_list_selectInput <- function(st_type = NULL, mult = F){
     st_list <- dbGetQuery(con, q)
     st_choice <- as.list(st_list$id)
     names(st_choice) <- st_list$name
-    selectInput('station_id',
+    selectInput('station_id', width = '350px',
                 label = enc2native('Станции'),
                 choices = st_choice,
                 selected = NULL, multiple = mult)
+  })
+}
+
+# получение из БД списка станций по которым есть данные в таблице ----
+get_station_list_ui <- function(){
+  renderUI({
+      q <- gsub("[\r\n\t]", "",
+                     paste0("SELECT DISTINCT fd.station, fs.name 
+                            FROM field_data fd
+                            LEFT JOIN field_site fs ON fd.station :: integer = fs.id
+                            ORDER BY fs.name DESC"))
+    st_list <- dbGetQuery(con, q)
+    st_choice <- as.list(st_list$station)
+    names(st_choice) <- st_list$name
+    pickerInput(inputId = 'ui_stations',
+                label ='Станции', width = '250px',
+                choices=st_choice,
+                selected = NULL,
+                multiple = T,
+                options = list(`actions-box` = TRUE,
+                               `deselect-all-text` = "Отменить",
+                               `select-all-text` = "Выбрать всё",
+                               `none-selected-text` = "Выберите..."))
+  })
+}
+
+# запрос на данные для графики ----
+get_plot_vars <- function(){
+  renderUI({
+    var <- dbGetQuery(con, "SELECT var_name FROM field_var_unit")
+    # print(var)
+    pickerInput('pick_var',
+                label ='Данные по оси X',
+                choices=var$var_name,
+                selected = NULL, 
+                options = list(`actions-box` = TRUE,
+                               `deselect-all-text` = "Отменить",
+                               `select-all-text` = "Выбрать всё",
+                               `none-selected-text` = "Выберите..."), 
+                multiple = T)
   })
 }
 
@@ -174,19 +214,3 @@ db_insert_weather <- function(){
   })
 }
 
-# запрос на данные для графики ----
-get_plot_vars <- function(){
-  renderUI({
-    var <- dbGetQuery(con, "SELECT var_name FROM field_var_unit")
-    # print(var)
-    pickerInput('pick_var',
-                label ='Данные по оси X',
-                choices=var$var_name,
-                selected = NULL, 
-                options = list(`actions-box` = TRUE,
-                               `deselect-all-text` = "Отменить",
-                               `select-all-text` = "Выбрать всё",
-                               `none-selected-text` = "Выберите..."), 
-                multiple = T)
-  })
-}

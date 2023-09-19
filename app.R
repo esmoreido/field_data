@@ -1,5 +1,5 @@
 library(shiny)
-# library(shinyjs)
+library(shinyjs)
 library(shinyWidgets)
 library(stringi)
 library(dplyr)
@@ -7,11 +7,12 @@ library(ggplot2)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
-# library(leaflet)
+library(DT)
+stl <- "display:inline-block; vertical-align:top;"
 
 
-# Основной контейнер приложения ----
-ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
+# UI Основной контейнер приложения ----
+ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
                  # Панель загрузки данных ----
@@ -22,23 +23,17 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                             
                             # App title 
                             titlePanel("Загрузка файлов с метеостанций"),
-                            
-                            # Боковая панель ----
-                            sidebarLayout(
-                              
-                              # Добавление файла 
-                              sidebarPanel(
-                                
-                                uiOutput('ui_st_import'),
+                                wellPanel(id = 'inputFile',
+                                          div(style = stl, uiOutput('ui_st_import')),
                                 
                                 # Input: Select a file 
-                                fileInput("file1", "Выбрать файл",
-                                          multiple = FALSE,
+                                div(style = stl, fileInput("file1", "Выбрать файл",
+                                          multiple = FALSE, width = '350px',
                                           accept = c("text/csv",
                                                      "text/comma-separated-values,text/plain",
                                                      ".csv"),
                                           buttonLabel = "Выбрать...",
-                                          placeholder = "Файл не выбран"),
+                                          placeholder = "Файл не выбран")),
                                 checkboxInput(inputId = "amdate", 
                                               label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
                                               value = F
@@ -60,19 +55,15 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                                 
                                 # Insert button 
                                 actionButton("insert_df", "Загрузить"),
-                                actionButton("reset1", "Очистить")
-                                
-                              ),
-                              
-                              # Основная панель таблицы ----
-                              mainPanel(
-                                
-                                # Вывод таблицы и результатов добавления ----
-                                div(dataTableOutput("contents"), style = "font-size:80%"),
+                                actionButton("reset1", "Очистить"),
                                 h2(textOutput("qry", inline = T))
-                              )
+                                ),
+                            wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
+                                # Вывод таблицы и результатов добавления ----
+                                div(DTOutput("contents"), style = "font-size:80%")
+                                )
                               
-                            )
+                            
                           )
                  ),
                  # Панель графика ----
@@ -83,24 +74,24 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                             
                             # Заголовок
                             titlePanel("Просмотр данных"),
-                            sidebarLayout(
-                              sidebarPanel(
-                                uiOutput('ui_stations'),
-                                uiOutput('ui_var'),
-                                selectInput("group", "Группировка", 
+                            wellPanel(
+                                div(style = stl, uiOutput('ui_stations')),
+                                div(style = stl, uiOutput('ui_var')),
+                                div(style = stl, 
+                                    selectInput("group", width = '250px', selectize = T, "Группировка", 
                                             choices = c('Без группировки'='nogroup', 
                                                         'По переменным'='group_var', 
-                                                        'По станциям'='group_stat')),
-                                actionButton("plot_graph", "Создать"),
-                                actionButton("reset2", "Очистить")
+                                                        'По станциям'='group_stat'))),
+                                div(style = "display:block;", 
+                                    actionButton("plot_graph", "Создать"),
+                                actionButton("reset2", "Очистить"))
                               ),
-                              mainPanel(
-                                div(style='overflow: scroll', 
+                              wellPanel(
+                                div(style='overflow: scroll; max-height: 600px', 
                                     plotOutput('plotdata')),
-                                div(dataTableOutput("datatable"), style = "font-size:80%")
+                                div(dataTableOutput("datatable"), style = "font-size:80%; overflow-y:scroll; max-height: 600px")
                               )
                             )
-                          )
                  ),
                  
                  # Панель перечня станций и постов ----
@@ -112,8 +103,30 @@ ui <- navbarPage(title = "КрымДанные", footer = div(class = "footer", 
                               titlePanel("Расположение объектов наблюдательной сети"),
                               # leafletOutput("stations_map"),
                               wellPanel(
-                                div(dataTableOutput("stations_table"), style = "font-size:80%")
+                                div(dataTableOutput("st_table"), style = "font-size:80%")
                               )
+                            )
+                          )
+                          
+                          
+                          
+                 ),
+                 # Панель удаления записей ----
+                 tabPanel(id = 'deltab', title = "Редактирование",
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            verticalLayout(
+                              titlePanel("Редактирование записей"),
+                              tags$p('Выберите строку таблицы для удаления записей и нажмите \"Удалить\", после этого нажмите \"Обновить\" и вернитесь на эту вкладку'),
+                              # wellPanel(
+                                div(DT::dataTableOutput('delete_table'),
+                                    style = "font-size:80%"),
+                                # verbatimTextOutput('delete_table_selection'),
+                              div(actionButton("delete_records_source", "Удалить"),
+                              actionButton("reset3", "Обновить")),
+                              textOutput("deleted_records", inline = T)
+                              # )
                             )
                           )
                           
@@ -131,7 +144,7 @@ server <- function(input, output, session) {
   con <- db_connect()
   
   # Перезагрузка приложения с кнопки ----
-  observeEvent(c(input$reset1,input$reset2), {
+  observeEvent(c(input$reset1,input$reset2,input$reset3), {
     shinyjs::js$refresh_page()
   }, ignoreNULL = T, ignoreInit = T)  
   
@@ -153,7 +166,7 @@ server <- function(input, output, session) {
   })
   
   # Вывод таблицы с загруженным файлом для просмотра ----
-  output$contents <- renderDataTable(
+  output$contents <- renderDT(
     input_df(), 
     options = list(pageLength = 10, 
                    language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
@@ -168,14 +181,16 @@ server <- function(input, output, session) {
   
   # Для панели графики ---- 
   # Получение из БД списка станций для графики ----
-  output$ui_stations <- get_weather_station_list_selectInput(NULL, T)
+  output$ui_stations <- get_station_list_ui()
   
   # Получение из БД списка переменных ----
   output$ui_var <- get_plot_vars()
   
   # Таблица для графика и вывода ----
   plot_df <- reactive({
-    req(input$station_id, input$pick_var)
+    req(input$ui_stations, input$pick_var)
+    print(input$pick_var)
+    print(input$ui_stations)
     q <- gsub("[\r\n\t]", "", 
               paste0("SELECT field_data.datetime, field_site.name, 
                 field_data.variable, field_data.change, field_data.source, 
@@ -186,7 +201,7 @@ server <- function(input, output, session) {
                        WHERE field_data.variable IN (\'", 
                      paste0(input$pick_var, collapse = '\', \''), "\') 
                 AND field_data.station IN ('",
-                     paste0(input$station_id, collapse = '\', \''),"')  ORDER BY datetime")
+                     paste0(input$ui_stations, collapse = '\', \''),"')  ORDER BY datetime")
     )
     print(q)
     tryCatch({
@@ -237,16 +252,27 @@ server <- function(input, output, session) {
     )
   })
   
-  # Карта ----
+  # Карта и таблица станций ----
   stations_df <- reactive({
-    pts <- dbGetQuery(con, "SELECT * FROM field_site")
-    # print(pts)
+    q <- gsub("[\r\n\t]", "", 
+              "SELECT fs.name, ft.type, fs.lon, fs.lat, fs.elev, fs.date_open, fs.date_closed
+      FROM field_site fs
+      LEFT JOIN field_device_type ft ON fs.type = ft.id
+              ORDER BY ft.type")
+    pts <- dbGetQuery(con, q)
     return(pts)
   })
+
+  # Таблица с перечнем станций ----
+  output$st_table <- renderDT(stations_df(), 
+                              colnames = c('Название', 'Тип', 'Долгота, °', 
+                                           'Широта, °', 'Высота, м', 
+                                           'Дата открытия', 'Дата закрытия'),
+                                  options = list(pageLength = 25,
+                                                 language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   
-  output$stations_table <- renderDataTable(stations_df(), 
-                                           options = list(pageLength = 25,
-                                                          language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+  
+  # Виджет с картой расположения станций (пока не работает на сервере) ----
   # output$stations_map <- renderLeaflet({
   #   typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
   #   leaflet(stations_df()) %>%
@@ -260,6 +286,39 @@ server <- function(input, output, session) {
   #               labels = c('Метеостанции', 'Гидропосты'))
   # })
   
+  
+  
+  stations_source <- reactive({
+    q <- gsub("[\r\n\t]", "", 
+              "SELECT DISTINCT fd.change, fd.source, fs.name, count(fd.value) as nv
+                FROM field_data fd
+                LEFT JOIN field_site fs ON fd.station::integer=fs.id
+                GROUP BY fd.change, fd.source, fs.name
+                ORDER BY fd.change")
+    pts <- dbGetQuery(con, q)
+    return(pts)
+  })
+  # Таблица с перечнем станций и источников для удаления ----
+  output$delete_table <- renderDT(stations_source(), server = FALSE, 
+                                  selection = 'single',
+                                  colnames = c('Дата добавления', 'Источник', 'Станция', 'Кол-во записей'),
+                                           options = list(pageLength = 25,
+                                                          language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+
+  # Удаление данных по нажатию кнопки ----
+  observeEvent(input$delete_records_source, {
+    q <- paste0("DELETE FROM field_data WHERE source = \'", 
+                stations_source()[input$delete_table_rows_selected,'source'],
+                "\' AND change = \'", 
+                stations_source()[input$delete_table_rows_selected,'change'],
+                "\'")
+    qry <- dbSendStatement(con, q)
+    res <- dbGetRowsAffected(qry)
+    print(res)
+    output$deleted_records <- renderText(paste0("Из базы удалено ", res, " записей."))
+  })
+  
+  
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
     #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
@@ -267,8 +326,7 @@ server <- function(input, output, session) {
     print('Disconnected')
   })
   
-  
-  
+ 
 }
 # Выполнение приложения ----
 shinyApp(ui, server)
