@@ -14,7 +14,7 @@ con <- dbConnect(drv, dbname = "hydromet",
                    user = "shiny_app", password = mypaw)
 rm(mypaw)
 dbListTables(con)
-dbListFields(con, 'field_site')
+dbListFields(con, 'field_var_unit')
 dbGetQuery(con, "SHOW CLIENT_ENCODING")
 
 st <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
@@ -27,11 +27,7 @@ q
 
 res <- dbGetQuery(con, q)
 
-
-st <- dbGetQuery(con, "SELECT * FROM field_data ORDER BY change DESC LIMIT 100")
-st
-
-rm <- paste0("DELETE FROM field_data")
+rm <- paste0("DELETE FROM field_var_unit")
 rm
 dbExecute(con, rm)
 
@@ -71,8 +67,10 @@ ggplot(df, aes(x=date, y=value, col=factor(index))) + geom_line()
 
 dbListFields(con, "field_site")
 
-df <- dbGetQuery(con, "SELECT * FROM field_site WHERE type = 1")
+df <- dbGetQuery(con, "SELECT * FROM field_data WHERE type = 1")
 paste0("'", paste(df$name, df$id, sep = "' = '", collapse = "', '"), "'")
+
+
 
 # загрузка информации по логгерам ----
 library(sf)
@@ -128,11 +126,13 @@ var_type <- c(rep('numeric', 6), 'character', rep('numeric', 2), 'character',
 var_use <- c(rep(1, 13), 0, rep(1, 15), rep(0, 8),rep(1, 4))
 
 var_df <- data.frame(var_names, var_unit_en, var_unit_ru, var_type, var_use)
+var_df$var_device_unit <- 1
 
 q <- gsub("[\r\n\t]", "",
-          paste0(c("INSERT INTO field_var_unit (var_name, var_unit_en, 
+          paste0(c("INSERT INTO field_var_unit (var_device_type, var_name, var_unit_en, 
                    var_unit_ru, var_type, var_use) VALUES ",
-                   paste0("('", var_df$var_name,  "','",
+                   paste0("('", var_df$var_device_unit,  "','",
+                          var_df$var_name,  "','",
                           var_df$var_unit_en,"','",
                           var_df$var_unit_ru,"','",
                           var_df$var_type,"','",
@@ -142,6 +142,36 @@ q <- gsub("[\r\n\t]", "",
 q
 dbExecute(con, enc2utf8(q))
 dbGetQuery(con, "SELECT * FROM field_var_unit")
+
+# добавление данных с логгеров в типы данных ----
+# q <- gsub("[\r\n\t]", "",
+#           "INSERT INTO field_var_unit (var_device_type, var_name, var_unit_en, 
+#                    var_unit_ru, var_type, var_use) VALUES
+#           (2, 'water_temp_u20', '°С', '°С', 'numeric', 1),
+#           (2, 'water_temp_u24', '°С', '°С', 'numeric', 1),
+#           (2, 'water_pres_u20', 'kPa', 'кПа', 'numeric', 1),
+#           (2, 'water_cond_u24', 'μS/cm', 'μС/см', 'numeric', 1)
+#           ON CONFLICT DO NOTHING")
+q <- gsub("[\r\n\t]", "",
+          "INSERT INTO field_var_unit (var_device_type, var_name, var_unit_en, 
+                   var_unit_ru, var_type, var_use) VALUES
+          (1, 'Pres_mm', 'mm hg', 'мм рт.ст.', 'numeric', 1)
+          ON CONFLICT DO NOTHING")
+q
+dbExecute(con, enc2utf8(q))
+dbGetQuery(con, "SELECT * FROM field_var_unit")
+
+var_name <- dbGetQuery(con, "SELECT id, var_name FROM field_var_unit WHERE var_device_type = 2 ORDER BY id")
+hobo_data_type <- 1
+if(hobo_data_type == 1){
+  var_name <- var_name %>%
+    filter(grepl('u20', var_name))
+}else{
+  var_name <- var_name %>%
+    filter(grepl('u24', var_name))
+}
+coln <- c('N', 'datetime', var_name$var_name[1], var_name$var_name[2], 'cd', 'ca', 'hc', 'eof')
+coln
 
 # проверка выгрузки данных с объединением ----
 

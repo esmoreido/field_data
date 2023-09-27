@@ -8,6 +8,7 @@ library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
 library(DT)
+# library(leaflet)
 stl <- "display:inline-block; vertical-align:top;"
 
 
@@ -15,7 +16,7 @@ stl <- "display:inline-block; vertical-align:top;"
 ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
-                 # Панель загрузки данных ----
+                 # Панель загрузки данных с метеостанций ----
                  tabPanel(title = "Загрузка с метеостанции",
                           fluidPage(
                             shinyjs::useShinyjs(),
@@ -60,12 +61,54 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                 ),
                             wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
                                 # Вывод таблицы и результатов добавления ----
-                                div(DTOutput("contents"), style = "font-size:80%")
+                                div(dataTableOutput("contents"), style = "font-size:80%")
                                 )
                               
                             
                           )
                  ),
+                 # Панель загрузки данных с логгеров HOBO ----
+                 tabPanel(title = "Загрузка с логгеров HOBO",
+                          fluidPage(
+                            shinyjs::useShinyjs(),
+                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                            
+                            # App title 
+                            titlePanel("Загрузка с логгеров HOBO"),
+                            wellPanel(id = 'inputFileHobo',
+                                      div(style = stl, 
+                                          uiOutput('ui_hobo_import')),
+                                      
+                                      div(style = stl, 
+                                          fileInput("file2", "Выбрать файл",
+                                                                 multiple = FALSE, width = '350px',
+                                                                 accept = c("text/csv",
+                                                                            "text/comma-separated-values,text/plain",
+                                                                            ".csv"),
+                                                                 buttonLabel = "Выбрать...",
+                                                                 placeholder = "Файл не выбран")),
+                                      div(style = stl, radioButtons(inputId = "hobo_data_type",
+                                                    label = "Вид логгера", inline = T,
+                                                   choices = c('Давление'='1', 'Электропроводность'='2'))),
+                            # Horizontal line 
+                            tags$hr(),
+                                      
+                                      # Insert button 
+                                      actionButton("insert_hobo_df", "Загрузить"),
+                                      actionButton("reset4", "Очистить"),
+                                      h2(textOutput("qry_hobo", inline = T))
+                            ),
+                            wellPanel(id = 'mainTable', 
+                                      # Вывод таблицы и результатов добавления c HOBO ----
+                                      div(style = "overflow-y:scroll; max-height: 600px",
+                                          DTOutput("contents_hobo"), 
+                                          style = "font-size:80%")
+                            )
+                            
+                            
+                          )
+                 ),
+                 
                  # Панель графика ----
                  tabPanel(title = "Просмотр",
                           fluidPage(
@@ -145,14 +188,14 @@ server <- function(input, output, session) {
   con <- db_connect()
   
   # Перезагрузка приложения с кнопки ----
-  observeEvent(c(input$reset1,input$reset2,input$reset3), {
+  observeEvent(c(input$reset1,input$reset2,input$reset3, input$reset4), {
     shinyjs::js$refresh_page()
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Получение из БД списка метеостанций для добавления в таблицу ----
-  output$ui_st_import <- get_weather_station_list_selectInput(1, F)
+  output$ui_st_import <- get_weather_station_list_selectInput(1, F, 'station_id')
   
-  # Основная таблица данных ----
+  # Таблица данных с метеостанции ----
   input_df <- reactive({
     req(input$file1)
     validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
@@ -164,6 +207,7 @@ server <- function(input, output, session) {
       },
       error = function(e) stop(safeError(e))
     )
+    return(df)
   })
   
   # Вывод таблицы с загруженным файлом для просмотра ----
@@ -173,10 +217,41 @@ server <- function(input, output, session) {
                    language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
   )
   
-  # Загрузка по нажатию кнопки ----
+  # Загрузка метео по нажатию кнопки ----
   observeEvent(input$insert_df, {
     
     output$qry <- db_insert_weather()
+    
+  })
+  
+  # Получение из БД списка логгеров для добавления в таблицу ----
+  output$ui_hobo_import <- get_weather_station_list_selectInput(2, F, 'station_hobo_id')
+  
+  # Таблица данных с логгера ----
+  input_df_hobo <- reactive({
+    req(input$file2)
+    validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc"), 
+                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"))
+    
+    tryCatch(
+      {
+        df <- read.hobo() # Внешняя функция чтения файла Davis
+      },
+      error = function(e) stop(safeError(e))
+    )
+  })
+  
+  # Вывод таблицы с загруженным файлом HOBO для просмотра ----
+  output$contents_hobo <- renderDT(
+    input_df_hobo(), 
+    options = list(pageLength = 10,
+                   language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
+  )
+  
+  # Загрузка HOBO по нажатию кнопки ----
+  observeEvent(input$insert_hobo_df, {
+    
+    output$qry_hobo <- db_insert_hobo()
     
   })
   
@@ -194,11 +269,13 @@ server <- function(input, output, session) {
     print(input$ui_stations)
     q <- gsub("[\r\n\t]", "", 
               paste0("SELECT field_data.datetime, field_site.name, 
-                field_data.variable, field_data.source, 
+                field_var_unit.var_name, field_data.source, 
                 field_data.value 
                        FROM field_data 
                        LEFT JOIN field_site
                        ON field_data.station::integer=field_site.id
+                       LEFT JOIN field_var_unit 
+                       ON field_data.variable::integer = field_var_unit.id
                        WHERE field_data.variable IN (\'", 
                      paste0(input$pick_var, collapse = '\', \''), "\') 
                 AND field_data.station IN ('",
@@ -219,15 +296,15 @@ server <- function(input, output, session) {
       withProgress(expr = {
         switch(input$group, 
                nogroup = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
-                   facet_wrap(variable~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
+                   facet_wrap(var_name~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
                    theme(legend.position = 'top') + 
                    labs(x='Дата', y='', col='')
                },
                group_var = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=variable)) + geom_line() +
+                 ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
                    facet_wrap(.~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
@@ -236,7 +313,7 @@ server <- function(input, output, session) {
                },
                group_stat = {
                  ggplot(plot_df(), aes(x = datetime, y = value, col=name)) + geom_line() +
-                   facet_wrap(.~variable, ncol = 1, scales = 'free_y', strip.position = 'right') +
+                   facet_wrap(.~var_name, ncol = 1, scales = 'free_y', strip.position = 'right') +
                    scale_x_datetime(date_labels = "%d.%m.%y") +
                    theme_light(base_size = 16) +
                    theme(legend.position = 'top') + 
@@ -247,7 +324,7 @@ server <- function(input, output, session) {
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = c('datetime', 'source'), names_from = c('name', 'variable'), values_from = 'value'),
+        pivot_wider(id_cols = c('datetime', 'source'), names_from = c('name', 'var_name'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
@@ -256,7 +333,7 @@ server <- function(input, output, session) {
   output$download <- downloadHandler(
     filename = function(){"krymdata_output.csv"}, 
     content = function(fname){
-      write.csv(plot_df(), fname, sep = ";", quote = F, row.names = F, na = '-32968')
+      write.csv(pivot_wider(plot_df(), id_cols = c('datetime', 'source'), names_from = c('name', 'var_name'), values_from = 'value'), fname, sep = ";", quote = F, row.names = F, na = '-32968')
     }
   )
   # Карта и таблица станций ----
@@ -285,9 +362,9 @@ server <- function(input, output, session) {
   #   leaflet(stations_df()) %>%
   #     addTiles() %>%
   #     addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-  #                      label = ~name, labelOptions = labelOptions(noHide = T), 
-  #                      fillColor = ~typepal(type), 
-  #                      stroke = F, 
+  #                      label = ~name, labelOptions = labelOptions(noHide = T),
+  #                      fillColor = ~typepal(type),
+  #                      stroke = F,
   #                      clusterOptions = markerClusterOptions()) %>%
   #     addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
   #               labels = c('Метеостанции', 'Гидропосты'))
@@ -303,6 +380,8 @@ server <- function(input, output, session) {
                 GROUP BY fd.change, fd.source, fs.name
                 ORDER BY fd.change")
     pts <- dbGetQuery(con, q)
+    pts <- pts %>%
+      arrange(desc(change))
     return(pts)
   })
   # Таблица с перечнем станций и источников для удаления ----
