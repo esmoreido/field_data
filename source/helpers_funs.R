@@ -1,9 +1,7 @@
 Sys.setlocale(category = "LC_ALL", locale = "Russian")
 library(ggplot2)
 library(lubridate)
-library(reshape2)
 library(RPostgreSQL)
-library(gridExtra)
 
 # загрузка csv davis ----
 
@@ -227,9 +225,7 @@ get_plot_vars <- function() {
 
 # функция соединения с базой данных ----
 db_connect <- function() {
-  mypaw <- {
-    "8IktF3go"
-  }
+  mypaw <- readLines('pwd.txt')
   drv <- dbDriver("PostgreSQL")
   tryCatch({
     con <- dbConnect(

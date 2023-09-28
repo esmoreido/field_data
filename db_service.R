@@ -27,7 +27,7 @@ q
 
 res <- dbGetQuery(con, q)
 
-rm <- paste0("DELETE FROM field_var_unit")
+rm <- paste0("DELETE FROM field_data")
 rm
 dbExecute(con, rm)
 
