@@ -107,6 +107,7 @@ read.weatherlink <- function() {
 # загрузка CSV HOBO ----
 
 read.hobo <- function() {
+  print(input$file2)
   filename = input$file2$datapath
   print(filename)
   station_name <- input$station_hobo_id
@@ -122,21 +123,43 @@ read.hobo <- function() {
   
   
   coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'eof')
-  
+  print(coln)
   # серийный номер логгера - пока никуда не добавляется
   # sn <- sub(".*?([0-9]+).$", "\\1", readLines(filename, n=1))
   
-  hobo_df <-
-    read.csv(file = filename,
-             sep = ',',
-             skip = 1,
-             encoding = 'UTF-8',
-             col.names = coln
-    )
+  # hobo_df <-
+  #   read.csv(file = filename,
+  #            sep = ',',
+  #            skip = 1,
+  #            encoding = 'UTF-8',
+  #            col.names = coln
+  #   )
+  print('header')
+  print(input$hobo_header)
+  if(input$hobo_header == 1){
+    skipl <- 2
+  }else{
+    skipl <- 1
+  }
+  print('xls')
+  print(input$hobo_xls)
+  if(input$hobo_xls == '2'){
+    hobo_df <- read.csv(file = filename, 
+                        sep = ',',  encoding = 'UTF-8', header = F, skip = skipl,
+                        col.names = coln)
+    hobo_df <- hobo_df %>%
+      mutate(datetime = as.POSIXct(strptime(datetime, format = '%m.%d.%y %I:%M:%S %p')),
+             station_name = station_name)
+  }else if (input$hobo_xls == '1'){
+    hobo_df <- read_xlsx(path = filename, skip = skipl, 
+                         col_types = c('numeric', 'date', rep('text', 2), rep('text', 4)),
+                         col_names = coln)
+    hobo_df <- hobo_df %>%
+      mutate(station_name = station_name)
+  }
+  print(head(hobo_df))
   
   hobo_df <- hobo_df %>%
-    mutate(datetime = as.POSIXct(strptime(datetime, format = '%m.%d.%y %I:%M:%S %p')),
-           station_name = station_name) %>%
     select(datetime, station_name, !!as.name(var_name$var_name[2]), !!as.name(var_name$var_name[1]))
   
   return(hobo_df)
@@ -159,7 +182,7 @@ get_weather_station_list_selectInput <-
       names(st_choice) <- st_list$name
       selectInput(inputId = input_id,
                   width = '350px',
-                  label = enc2native('Станции'),
+                  label = enc2native('Станция'),
                   choices = st_choice,
                   selected = NULL,
                   multiple = mult

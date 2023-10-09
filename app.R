@@ -8,8 +8,9 @@ library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
 library(DT)
+library(readxl)
 # library(leaflet)
-stl <- "display:inline-block; vertical-align:top;"
+stl <- "display:inline-block; vertical-align:top"
 
 
 # UI Основной контейнер приложения ----
@@ -25,9 +26,7 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                             # App title 
                             titlePanel("Загрузка файлов с метеостанций"),
                                 wellPanel(id = 'inputFile',
-                                          div(style = stl, uiOutput('ui_st_import')),
-                                
-                                # Input: Select a file 
+                                          # Input: Select a file 
                                 div(style = stl, fileInput("file1", "Выбрать файл",
                                           multiple = FALSE, width = '350px',
                                           accept = c("text/csv",
@@ -35,6 +34,7 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                                      ".csv"),
                                           buttonLabel = "Выбрать...",
                                           placeholder = "Файл не выбран")),
+                                div(style = stl, uiOutput('ui_st_import')),
                                 checkboxInput(inputId = "amdate", 
                                               label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
                                               value = F
@@ -77,19 +77,24 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                             titlePanel("Загрузка с логгеров HOBO"),
                             wellPanel(id = 'inputFileHobo',
                                       div(style = stl, 
-                                          uiOutput('ui_hobo_import')),
-                                      
-                                      div(style = stl, 
                                           fileInput("file2", "Выбрать файл",
                                                                  multiple = FALSE, width = '350px',
-                                                                 accept = c("text/csv",
+                                                                 accept = c("text/csv",".xlsx",
                                                                             "text/comma-separated-values,text/plain",
-                                                                            ".csv"),
+                                                                            ".csv",
+                                                                            ".xlsx"),
                                                                  buttonLabel = "Выбрать...",
                                                                  placeholder = "Файл не выбран")),
-                                      div(style = stl, radioButtons(inputId = "hobo_data_type",
+                                      div(style = stl, 
+                                          uiOutput('ui_hobo_import')),
+                                      div(radioButtons(inputId = "hobo_data_type",
                                                     label = "Вид логгера", inline = T,
                                                    choices = c('Давление'='1', 'Электропроводность'='2'))),
+                                      div(radioButtons(inputId = "hobo_xls",
+                                                                    label = "Формат файла", inline = T,
+                                                                    choices = c('txt/csv'='2', 'excel'='1'))),
+                                      div(style = stl, checkboxInput(inputId = 'hobo_header',  value = 0, 
+                                                                     label = 'Есть первая строка с номером (Plot Title: XXXXXXX)')),
                             # Horizontal line 
                             tags$hr(),
                                       
@@ -230,12 +235,12 @@ server <- function(input, output, session) {
   # Таблица данных с логгера ----
   input_df_hobo <- reactive({
     req(input$file2)
-    validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc"), 
-                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"))
+    validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc", "xlsx"), 
+                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc) или файл Excel (xlsx)"))
     
     tryCatch(
       {
-        df <- read.hobo() # Внешняя функция чтения файла Davis
+        df <- read.hobo() # Внешняя функция чтения файла hobo
       },
       error = function(e) stop(safeError(e))
     )
