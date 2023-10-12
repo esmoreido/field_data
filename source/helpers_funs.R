@@ -180,13 +180,15 @@ get_weather_station_list_selectInput <-
       st_list <- dbGetQuery(con, q)
       st_choice <- as.list(st_list$id)
       names(st_choice) <- st_list$name
-      selectInput(inputId = input_id,
+      selectizeInput(inputId = input_id,
                   width = '350px',
                   label = enc2native('Станция'),
-                  choices = st_choice,
+                  choices = st_choice, 
                   selected = NULL,
-                  multiple = mult
-      )
+                  multiple = mult, 
+                  options = list(
+                    placeholder = 'Выберите станцию...',
+                    onInitialize = I('function() { this.setValue(""); }')))
     })
   }
 
