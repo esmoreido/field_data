@@ -3,12 +3,16 @@ library(shinyjs)
 library(shinyWidgets)
 library(stringi)
 library(dplyr)
-library(ggplot2)
+# library(ggplot2)
+library(dygraphs)
 library(lubridate)
 library(RPostgreSQL)
 library(tidyverse)
 library(DT)
 library(readxl)
+library(htmltools)
+library(xts)
+library(reshape2)
 # library(leaflet)
 stl <- "display:inline-block; vertical-align:top"
 
@@ -136,8 +140,10 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                 actionButton("reset2", "Очистить"))
                               ),
                               wellPanel(
-                                div(style='overflow: scroll; max-height: 600px', 
-                                    plotOutput('plotdata')),
+                                # div(style='overflow: scroll; max-height: 600px', 
+                                #     plotOutput('plotdata')),
+                                div(style='overflow: scroll', 
+                                    htmlOutput('plotdata')),
                                 div(dataTableOutput("datatable"), style = "font-size:80%; overflow-y:scroll; max-height: 600px")
                               )
                             )
@@ -274,8 +280,7 @@ server <- function(input, output, session) {
     print(input$ui_stations)
     q <- gsub("[\r\n\t]", "", 
               paste0("SELECT field_data.datetime, field_site.name, 
-                field_var_unit.var_name, field_data.source, 
-                field_data.value 
+                field_var_unit.var_name, field_data.value 
                        FROM field_data 
                        LEFT JOIN field_site
                        ON field_data.station::integer=field_site.id
@@ -297,34 +302,52 @@ server <- function(input, output, session) {
   
   # График ----
   observeEvent(input$plot_graph, {
-    output$plotdata <- renderPlot({
+    # output$plotdata <- renderPlot({
+    #   withProgress(expr = {
+    #     switch(input$group, 
+    #            nogroup = {
+    #              ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
+    #                facet_wrap(var_name~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
+    #                scale_x_datetime(date_labels = "%d.%m.%y") +
+    #                theme_light(base_size = 16) +
+    #                theme(legend.position = 'top') + 
+    #                labs(x='Дата', y='', col='')
+    #            },
+    #            group_var = {
+    #              ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
+    #                facet_wrap(.~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
+    #                scale_x_datetime(date_labels = "%d.%m.%y") +
+    #                theme_light(base_size = 16) +
+    #                theme(legend.position = 'top') + 
+    #                labs(x='Дата', y='', col='')
+    #            },
+    #            group_stat = {
+    #              ggplot(plot_df(), aes(x = datetime, y = value, col=name)) + geom_line() +
+    #                facet_wrap(.~var_name, ncol = 1, scales = 'free_y', strip.position = 'right') +
+    #                scale_x_datetime(date_labels = "%d.%m.%y") +
+    #                theme_light(base_size = 16) +
+    #                theme(legend.position = 'top') + 
+    #                labs(x='Дата', y='', col='')
+    #            }
+    #     )}, message = "Загрузка...")
+    # })
+    
+    output$plotdata <- renderUI({
       withProgress(expr = {
-        switch(input$group, 
-               nogroup = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
-                   facet_wrap(var_name~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-                   scale_x_datetime(date_labels = "%d.%m.%y") +
-                   theme_light(base_size = 16) +
-                   theme(legend.position = 'top') + 
-                   labs(x='Дата', y='', col='')
-               },
-               group_var = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
-                   facet_wrap(.~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-                   scale_x_datetime(date_labels = "%d.%m.%y") +
-                   theme_light(base_size = 16) +
-                   theme(legend.position = 'top') + 
-                   labs(x='Дата', y='', col='')
-               },
-               group_stat = {
-                 ggplot(plot_df(), aes(x = datetime, y = value, col=name)) + geom_line() +
-                   facet_wrap(.~var_name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-                   scale_x_datetime(date_labels = "%d.%m.%y") +
-                   theme_light(base_size = 16) +
-                   theme(legend.position = 'top') + 
-                   labs(x='Дата', y='', col='')
-               }
-        )}, message = "Загрузка...")
+        df <- dcast(plot_df(), datetime~name+var_name, value.var = 'value')
+        ts <- as.xts(df[,-1], 
+                     order.by = as.POSIXct(df$datetime, 
+                                           format = "%Y-%m-%d %H:%M:%S"))
+        lst <- lapply(ts, function (x) dygraph(x, main = colnames(x), 
+                                               group = 'plots', 
+                                               width = 'auto', 
+                                               height = 200) %>% 
+                        dyRangeSelector() %>%
+                        dyOptions(colors = RColorBrewer::brewer.pal(3, "Set2")))
+        # print(lst)
+        res <- htmltools::tagList(lst)
+        return(res)
+        }, message = "Загрузка...")
     })
     # Вывод ----
     output$datatable <- renderDataTable(

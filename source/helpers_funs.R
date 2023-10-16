@@ -155,7 +155,8 @@ read.hobo <- function() {
                          col_types = c('numeric', 'date', rep('text', 2), rep('text', 4)),
                          col_names = coln)
     hobo_df <- hobo_df %>%
-      mutate(station_name = station_name)
+      mutate(station_name = station_name) %>%
+      mutate(across(is.numeric(), na_if, "NULL"))
   }
   print(head(hobo_df))
   
@@ -368,12 +369,11 @@ db_insert_hobo <- function() {
       select(datetime, station_name, id, value) %>%
       rename(variable = id)
     
-    print(head(df))
+    # print(head(df))
     created_on <- now()
     data_source <- input$file2$name
-    # print(data_source)
-    type <-
-      '2' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
+    print(data_source)
+    type <- '2' # 1 - метеостанция, 2 - логгер уровня и температуры, 3 - логгер электропроводности и температуры
     n <- nrow(df)
     q <- gsub("[\r\n\t]", "",
               paste0(
@@ -405,7 +405,7 @@ db_insert_hobo <- function() {
     
     # замена флага отсутствующих значений, чтобы запрос PostgreSQL не ругался
     q <- gsub("\'NA\'", "NULL", q)
-    print(q)
+    # print(q)
     withProgress(expr = {
       qry <-
         dbSendStatement(con, q)
