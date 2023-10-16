@@ -97,6 +97,8 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                       div(radioButtons(inputId = "hobo_xls",
                                                                     label = "Формат файла", inline = T,
                                                                     choices = c('txt/csv'='2', 'excel'='1'))),
+                                      div(style = stl, checkboxInput(inputId = 'ninecol',  value = 0, 
+                                                                     label = 'В файле 9 колонок данных')),
                                       div(style = stl, checkboxInput(inputId = 'hobo_header',  value = 0, 
                                                                      label = 'Есть первая строка с номером (Plot Title: XXXXXXX)')),
                             # Horizontal line 
@@ -352,7 +354,7 @@ server <- function(input, output, session) {
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = c('datetime', 'source'), names_from = c('name', 'var_name'), values_from = 'value'),
+        pivot_wider(id_cols = 'datetime', names_from = c('name', 'var_name'), values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )

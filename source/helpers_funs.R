@@ -107,9 +107,9 @@ read.weatherlink <- function() {
 # загрузка CSV HOBO ----
 
 read.hobo <- function() {
-  print(input$file2)
+  # print(input$file2)
   filename = input$file2$datapath
-  print(filename)
+  # print(filename)
   station_name <- input$station_hobo_id
   # print(station_name)
   var_name <- dbGetQuery(con, "SELECT id, var_name FROM field_var_unit WHERE var_device_type = 2 ORDER BY id")
@@ -121,9 +121,13 @@ read.hobo <- function() {
       filter(grepl('u24', var_name))
   }
   
-  
-  coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'eof')
-  print(coln)
+  if(input$ninecol == FALSE){
+    coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'eof')
+  }else{
+    colt <- c('numeric', 'date', rep('text', 7))
+    coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'std', 'eof')
+  }
+  # print(coln)
   # серийный номер логгера - пока никуда не добавляется
   # sn <- sub(".*?([0-9]+).$", "\\1", readLines(filename, n=1))
   
@@ -134,15 +138,15 @@ read.hobo <- function() {
   #            encoding = 'UTF-8',
   #            col.names = coln
   #   )
-  print('header')
-  print(input$hobo_header)
+  # print('header')
+  # print(input$hobo_header)
   if(input$hobo_header == 1){
     skipl <- 2
   }else{
     skipl <- 1
   }
-  print('xls')
-  print(input$hobo_xls)
+  # print('xls')
+  # print(input$hobo_xls)
   if(input$hobo_xls == '2'){
     hobo_df <- read.csv(file = filename, 
                         sep = ',',  encoding = 'UTF-8', header = F, skip = skipl,
@@ -152,11 +156,11 @@ read.hobo <- function() {
              station_name = station_name)
   }else if (input$hobo_xls == '1'){
     hobo_df <- read_xlsx(path = filename, skip = skipl, 
-                         col_types = c('numeric', 'date', rep('text', 2), rep('text', 4)),
+                         col_types = colt,
                          col_names = coln)
+    print(head(hobo_df))
     hobo_df <- hobo_df %>%
-      mutate(station_name = station_name) %>%
-      mutate(across(is.numeric(), na_if, "NULL"))
+      mutate(station_name = station_name)
   }
   print(head(hobo_df))
   
