@@ -123,6 +123,7 @@ read.hobo <- function() {
   
   if(input$ninecol == FALSE){
     coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'eof')
+    colt <- c('numeric', 'date', rep('text', 6))
   }else{
     colt <- c('numeric', 'date', rep('text', 7))
     coln <- c('N', 'datetime', var_name$var_name[2], var_name$var_name[1], 'cd', 'ca', 'hc', 'std', 'eof')

@@ -16,7 +16,6 @@ rm(mypaw)
 dbListTables(con)
 dbListFields(con, 'field_var_unit')
 dbGetQuery(con, "SHOW CLIENT_ENCODING")
-
 st <- dbGetQuery(con, "SELECT DISTINCT station FROM field_data")
 st
 Encoding(st$station)
@@ -92,14 +91,26 @@ q <- paste0("INSERT INTO field_site (name, type, lon, lat) VALUES ('",
 q
 qry <- dbSendQuery(con, q)
 dbGetRowsAffected(qry)
-dbGetQuery(con, "SELECT * FROM field_device")
+dbGetQuery(con, "DELETE FROM field_device_type")
 
+
+# загрузка мета информации по станциям ----
+
+q <- "INSERT INTO field_site_type (id, type) VALUES (1, 'Метеостанция'), (2, 'Гидропост')"
+dbExecute(con, enc2utf8(q))
+dbGetQuery(con, "SELECT * FROM field_device_type")
 
 # загрузка мета информации по устройствам ----
 
-q <- "INSERT INTO field_device_type (id, type) VALUES (1, 'Метеостанция'), (2, 'Гидропост')"
+q <- "INSERT INTO field_device_type (id, type) VALUES (1, 'Метеостанция'), (2, 'Логгер уровня'), (3, 'Логгер электропроводности')"
 dbExecute(con, enc2utf8(q))
 dbGetQuery(con, "SELECT * FROM field_device_type")
+
+# загрузка информации по устройствам ----
+dbListFields(con, "field_device")
+q <- "INSERT INTO field_device (id,serialnum,type,brand,model,date_install) VALUES (1,'21182124',2,'Onset','HOBO U-20L','2021-09-22'), (2,'21182127',2,'Onset','HOBO U-20L','2021-09-22'), (3,'21182119',2,'Onset','HOBO U-20L','2021-09-22'), (4,'21182135',2,'Onset','HOBO U-20L','2021-09-22'), (5,'21182132',2,'Onset','HOBO U-20L','2021-09-22'), (6,'21182134',2,'Onset','HOBO U-20L','2021-09-22'), (7,'21182133',2,'Onset','HOBO U-20L','2021-09-22'), (8,'21182136',2,'Onset','HOBO U-20L','2021-09-22'), (9,'21154781',2,'Onset','HOBO U24','2021-09-22'), (10,'21154782',2,'Onset','HOBO U24','2021-09-22'), (11,'21154780',2,'Onset','HOBO U24','2021-09-22'), (12,'21154779',2,'Onset','HOBO U24','2021-09-22'), (13,'21154778',2,'Onset','HOBO U24','2021-09-22'), (14,'21154777',2,'Onset','HOBO U24','2021-09-22'), (15,'34.0.0082',1,'Davis','Vantage Pro2','2021-09-22'), (16,'34.0.0083',1,'Davis','Vantage Pro2','2021-09-22'), (17,'34.0.0084',1,'Davis','Vantage Pro2','2021-09-22'), (18,'34.0.0085',1,'Davis','Vantage Pro2','2021-09-22'), (19,'34.0.0086',1,'Davis','Vantage Pro2','2021-09-22'), (20,'34.0.0087',1,'Davis','Vantage Pro2','2021-09-22')"
+dbExecute(con, enc2utf8(q))
+dbGetQuery(con, "SELECT * FROM field_device")
 
 # загрузка мета информации по переменным ----
 var_names <- c("Temp_Out", "Hi_Temp", "Low_Temp", "Out_Hum", "Dew_Pt", 
