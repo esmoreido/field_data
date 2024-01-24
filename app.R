@@ -336,7 +336,9 @@ server <- function(input, output, session) {
     
     output$plotdata <- renderUI({
       withProgress(expr = {
-        df <- dcast(plot_df(), datetime~name+var_name, value.var = 'value')
+        df <- pivot_wider(data = plot_df(), id_cols = datetime,  
+                          names_from = c('name', 'var_name'), names_sep = '_', 
+                          values_from = 'value')
         ts <- as.xts(df[,-1], 
                      order.by = as.POSIXct(df$datetime, 
                                            format = "%Y-%m-%d %H:%M:%S"))
@@ -354,7 +356,8 @@ server <- function(input, output, session) {
     # Вывод ----
     output$datatable <- renderDataTable(
       plot_df() %>%
-        pivot_wider(id_cols = 'datetime', names_from = c('name', 'var_name'), values_from = 'value'),
+        pivot_wider(id_cols = 'datetime', names_from = c('name', 'var_name'), 
+                    values_from = 'value'),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
@@ -363,7 +366,10 @@ server <- function(input, output, session) {
   output$download <- downloadHandler(
     filename = function(){"krymdata_output.csv"}, 
     content = function(fname){
-      write.csv(pivot_wider(plot_df(), id_cols = c('datetime', 'source'), names_from = c('name', 'var_name'), values_from = 'value'), fname, sep = ";", quote = F, row.names = F, na = '-32968')
+      write.csv(pivot_wider(plot_df(), id_cols = c('datetime', 'source'), 
+                            names_from = c('name', 'var_name'), 
+                            values_from = 'value'), 
+                fname, sep = ";", quote = F, row.names = F, na = '-32968')
     }
   )
   # Карта и таблица станций ----
