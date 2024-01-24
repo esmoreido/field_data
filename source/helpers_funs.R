@@ -410,10 +410,10 @@ db_insert_hobo <- function() {
     
     # замена флага отсутствующих значений, чтобы запрос PostgreSQL не ругался
     q <- gsub("\'NA\'", "NULL", q)
-    print(q)
+    # print(q)
     withProgress(expr = {
       qry <-
-        dbSendStatement(con, q)
+        dbSendStatement(con, enc2utf8(q))
     }, message = "Добавление записей в таблицу, подождите...")
     res <- dbGetRowsAffected(qry)
     print(res)

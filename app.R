@@ -12,7 +12,7 @@ library(DT)
 library(readxl)
 library(htmltools)
 library(xts)
-library(reshape2)
+# library(reshape2)
 # library(leaflet)
 stl <- "display:inline-block; vertical-align:top"
 
