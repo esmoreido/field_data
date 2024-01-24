@@ -300,6 +300,7 @@ server <- function(input, output, session) {
     error = function(e) return(e)
     )
     return(df)
+    print(head(df))
   })
   
   # График ----
@@ -366,7 +367,7 @@ server <- function(input, output, session) {
   output$download <- downloadHandler(
     filename = function(){"krymdata_output.csv"}, 
     content = function(fname){
-      write.csv(pivot_wider(plot_df(), id_cols = c('datetime', 'source'), 
+      write.csv(pivot_wider(plot_df(), id_cols = 'datetime',
                             names_from = c('name', 'var_name'), 
                             values_from = 'value'), 
                 fname, sep = ";", quote = F, row.names = F, na = '-32968')
