@@ -13,12 +13,13 @@ library(readxl)
 library(htmltools)
 library(xts)
 # library(reshape2)
-# library(leaflet)
+library(leaflet)
 stl <- "display:inline-block; vertical-align:top"
 
 
 # UI Основной контейнер приложения ----
-ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(class = "footer", includeHTML("footer.html")), 
+ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", 
+                 footer = div(class = "footer", includeHTML("footer.html")), 
                  fluid = T, windowTitle = "КрымДанные", lang = "ru",
                  
                  # Панель загрузки данных с метеостанций ----
@@ -65,6 +66,7 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                 ),
                             wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
                                 # Вывод таблицы и результатов добавления ----
+                                div(h3(textOutput('weather_warning'))),
                                 div(dataTableOutput("contents"), style = "font-size:80%")
                                 )
                               
@@ -110,6 +112,7 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                                       h2(textOutput("qry_hobo", inline = T))
                             ),
                             wellPanel(id = 'mainTable', 
+                                      h3(textOutput('hobo_warning')),
                                       # Вывод таблицы и результатов добавления c HOBO ----
                                       div(style = "overflow-y:scroll; max-height: 600px",
                                           DTOutput("contents_hobo"), 
@@ -131,11 +134,11 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                             wellPanel(
                                 div(style = stl, uiOutput('ui_stations')),
                                 div(style = stl, uiOutput('ui_var')),
-                                div(style = stl, 
-                                    selectInput("group", width = '250px', selectize = T, "Группировка", 
-                                            choices = c('Без группировки'='nogroup', 
-                                                        'По переменным'='group_var', 
-                                                        'По станциям'='group_stat'))),
+                                # div(style = stl, 
+                                #     selectInput("group", width = '250px', selectize = T, "Группировка", 
+                                #             choices = c('Без группировки'='nogroup', 
+                                #                         'По переменным'='group_var', 
+                                #                         'По станциям'='group_stat'))),
                                 div(style = "display:block;", 
                                     actionButton("plot_graph", "Создать"),
                                     downloadButton('download',"Скачать таблицу"),
@@ -157,10 +160,13 @@ ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", footer = div(
                             shinyjs::useShinyjs(),
                             shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
                             verticalLayout(
-                              titlePanel("Расположение объектов наблюдательной сети"),
-                              # leafletOutput("stations_map"),
+                              titlePanel("Объекты наблюдательной сети"),
+                              leafletOutput("stations_map"),
                               wellPanel(
                                 div(dataTableOutput("st_table"), style = "font-size:80%")
+                              ),
+                              wellPanel(
+                                div(dataTableOutput("nval_table"), style = "font-size:80%")
                               )
                             )
                           )
@@ -198,7 +204,7 @@ server <- function(input, output, session) {
   source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
   # соединение с БД
-  con <- db_connect()
+  con <- db_connect('pwd.txt')
   
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2,input$reset3, input$reset4), {
@@ -211,9 +217,11 @@ server <- function(input, output, session) {
   # Таблица данных с метеостанции ----
   input_df <- reactive({
     req(input$file1)
-    validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
-                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"))
-    
+    output$weather_warning <- validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
+                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
+             need(input$station_id != '', 'Выберите название станции!')
+    )
+
     tryCatch(
       {
         df <- read.weatherlink() # Внешняя функция чтения файла Davis
@@ -243,8 +251,11 @@ server <- function(input, output, session) {
   # Таблица данных с логгера ----
   input_df_hobo <- reactive({
     req(input$file2)
-    validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc", "xlsx"), 
-                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc) или файл Excel (xlsx)"))
+    
+    output$hobo_warning <- validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc"), 
+                                            "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
+                                       need(input$station_hobo_id != '', 'Выберите название станции!')
+    )
     
     tryCatch(
       {
@@ -305,44 +316,23 @@ server <- function(input, output, session) {
   
   # График ----
   observeEvent(input$plot_graph, {
-    # output$plotdata <- renderPlot({
-    #   withProgress(expr = {
-    #     switch(input$group, 
-    #            nogroup = {
-    #              ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
-    #                facet_wrap(var_name~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-    #                scale_x_datetime(date_labels = "%d.%m.%y") +
-    #                theme_light(base_size = 16) +
-    #                theme(legend.position = 'top') + 
-    #                labs(x='Дата', y='', col='')
-    #            },
-    #            group_var = {
-    #              ggplot(plot_df(), aes(x = datetime, y = value, col=var_name)) + geom_line() +
-    #                facet_wrap(.~name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-    #                scale_x_datetime(date_labels = "%d.%m.%y") +
-    #                theme_light(base_size = 16) +
-    #                theme(legend.position = 'top') + 
-    #                labs(x='Дата', y='', col='')
-    #            },
-    #            group_stat = {
-    #              ggplot(plot_df(), aes(x = datetime, y = value, col=name)) + geom_line() +
-    #                facet_wrap(.~var_name, ncol = 1, scales = 'free_y', strip.position = 'right') +
-    #                scale_x_datetime(date_labels = "%d.%m.%y") +
-    #                theme_light(base_size = 16) +
-    #                theme(legend.position = 'top') + 
-    #                labs(x='Дата', y='', col='')
-    #            }
-    #     )}, message = "Загрузка...")
-    # })
-    
     output$plotdata <- renderUI({
       withProgress(expr = {
-        df <- pivot_wider(data = plot_df(), id_cols = datetime,  
-                          names_from = c('name', 'var_name'), names_sep = '_', 
-                          values_from = 'value')
-        ts <- as.xts(df[,-1], 
-                     order.by = as.POSIXct(df$datetime, 
-                                           format = "%Y-%m-%d %H:%M:%S"))
+        
+            df <- pivot_wider(data = plot_df(), id_cols = datetime,  
+                              names_from = c('name', 'var_name'), names_sep = '_', 
+                              values_from = 'value')
+          print(head(df))
+            tryCatch({
+                ts <- as.xts(df[,-1], 
+                             order.by = as.POSIXct(df$datetime, 
+                                                   format = "%Y-%m-%d %H:%M:%S"))
+              }, warning = function(war){
+                print(paste("Предупреждение:  ", err))
+              }, error = function(e){
+                print(paste("Ошибка:  ", err))
+                stop(safeError(e))
+              })
         lst <- lapply(ts, function (x) dygraph(x, main = colnames(x), 
                                                group = 'plots', 
                                                width = 'auto', 
@@ -392,23 +382,45 @@ server <- function(input, output, session) {
                                   options = list(pageLength = 25,
                                                  language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   
+  # Виджет с количеством данных наблюдений по станциям ----
+  nval_df <- reactive({
+    q <- gsub("[\r\n\t]", "", 
+              "SELECT DISTINCT fs.name, fv.var_name, 
+          count(fd.value) as nval, 
+          min(fd.datetime) as start, 
+          max(fd.datetime) as end
+          FROM field_data fd 
+          LEFT JOIN field_site fs ON fd.station::integer=fs.id  
+          LEFT JOIN field_var_unit fv ON fd.variable::integer=fv.id
+          GROUP BY fv.var_name, fs.name
+          ORDER BY fv.var_name")
+    return(dbGetQuery(con, q))
+  })
+  
+  output$nval_table <- renderDT(nval_df(),
+                                colnames = c('Станция', 'Показатель', 'Число', 
+                                             'Начало', 'Окончание'),
+                                options = list(pageLength = 25,
+                                               language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   
   # Виджет с картой расположения станций (пока не работает на сервере) ----
-  # output$stations_map <- renderLeaflet({
-  #   typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
-  #   leaflet(stations_df()) %>%
-  #     addTiles() %>%
-  #     addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-  #                      label = ~name, labelOptions = labelOptions(noHide = T),
-  #                      fillColor = ~typepal(type),
-  #                      stroke = F,
-  #                      clusterOptions = markerClusterOptions()) %>%
-  #     addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
-  #               labels = c('Метеостанции', 'Гидропосты'))
-  # })
+  output$stations_map <- renderLeaflet({
+    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+    leaflet(stations_df()) %>%
+      addTiles() %>%
+      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+                       label = ~name, labelOptions = labelOptions(noHide = T),
+                       fillColor = ~typepal(type),
+                       stroke = F,
+                       clusterOptions = markerClusterOptions()) %>%
+      addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
+                labels = c('Метеостанции', 'Гидропосты'))
+  })
+
   
   
-  
+
+  # Таблица с перечнем станций и источников для удаления ----
   stations_source <- reactive({
     q <- gsub("[\r\n\t]", "", 
               "SELECT DISTINCT fd.change, fd.source, fs.name, count(fd.value) as nv
@@ -421,7 +433,7 @@ server <- function(input, output, session) {
       arrange(desc(change))
     return(pts)
   })
-  # Таблица с перечнем станций и источников для удаления ----
+  
   output$delete_table <- renderDT(stations_source(), server = FALSE, 
                                   selection = 'single',
                                   colnames = c('Дата добавления', 'Источник', 'Станция', 'Кол-во записей'),

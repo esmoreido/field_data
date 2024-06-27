@@ -26,7 +26,7 @@ q
 
 res <- dbGetQuery(con, q)
 
-rm <- paste0("DELETE FROM field_data")
+rm <- paste0("DELETE FROM field_data WHERE station = \'\'")
 rm
 dbExecute(con, rm)
 
@@ -215,6 +215,23 @@ q <- gsub("[\r\n\t]", "",
 q
 df <- dbGetQuery(con, q)
 
+# подсчет данных ----
+q <- gsub("[\r\n\t]", "", 
+          "SELECT DISTINCT fs.name, fv.var_name, 
+          count(fd.value) as nval, 
+          min(fd.datetime) as start, 
+          max(fd.datetime) as end
+          FROM field_data fd 
+          LEFT JOIN field_site fs ON fd.station::integer=fs.id  
+          LEFT JOIN field_var_unit fv ON fd.variable::integer=fv.id
+          GROUP BY fv.var_name, fs.name
+          ORDER BY fv.var_name")
+q
+df <- dbGetQuery(con, q)
+df %>% 
+  pivot_wider(id_cols = 'name', names_from = 'var_name', values_from = c(paste('nval', 'start', 'end', col = '-'))) %>%
+  filter_all(any_vars(!is.na(.))) %>%
+  t()
 
 # разъединение ----
 dbDisconnect(con)

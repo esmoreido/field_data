@@ -1,6 +1,8 @@
 Sys.setlocale(category = "LC_ALL", locale = "Russian")
 library(ggplot2)
 library(lubridate)
+library(dplyr)
+library(tidyverse)
 library(RPostgreSQL)
 
 # загрузка csv davis ----
@@ -104,6 +106,7 @@ read.weatherlink <- function() {
   
 }
 
+
 # загрузка CSV HOBO ----
 
 read.hobo <- function() {
@@ -172,7 +175,9 @@ read.hobo <- function() {
 }
 
 
+
 # получение из БД списка метеостанций для добавления в таблицу ----
+
 get_weather_station_list_selectInput <-
   function(st_type = NULL, mult = F, input_id = 'station_id') {
     renderUI({
@@ -197,6 +202,7 @@ get_weather_station_list_selectInput <-
                     onInitialize = I('function() { this.setValue(""); }')))
     })
   }
+
 
 # получение из БД списка станций по которым есть данные в таблице ----
 get_station_list_ui <- function() {
@@ -231,6 +237,7 @@ get_station_list_ui <- function() {
   })
 }
 
+
 # запрос на данные для графики ----
 get_plot_vars <- function() {
   renderUI({
@@ -254,9 +261,10 @@ get_plot_vars <- function() {
   })
 }
 
+
 # функция соединения с базой данных ----
-db_connect <- function() {
-  mypaw <- readLines('pwd.txt')
+db_connect <- function(f = 'pwd.txt') {
+  mypaw <- readLines(f)
   drv <- dbDriver("PostgreSQL")
   tryCatch({
     con <- dbConnect(
@@ -276,6 +284,7 @@ db_connect <- function() {
   rm(mypaw)
   return(con)
 }
+
 
 # запрос  на вставку в БД метеоданных ----
 db_insert_weather <- function() {
@@ -338,8 +347,7 @@ db_insert_weather <- function() {
     # print(q)
     
     withProgress(expr = {
-      qry <-
-        dbSendStatement(con, q)
+      qry <- dbSendStatement(con, q)
     }, message = "Добавление записей в таблицу, подождите...")
     res <- dbGetRowsAffected(qry)
     print(res)
@@ -359,6 +367,7 @@ db_insert_weather <- function() {
   })
 }
 
+
 # запрос  на вставку в БД данных логгера ----
 
 db_insert_hobo <- function() {
@@ -374,7 +383,7 @@ db_insert_hobo <- function() {
       select(datetime, station_name, id, value) %>%
       rename(variable = id)
     
-    # print(head(df))
+    print(head(df))
     created_on <- now()
     data_source <- input$file2$name
     print(data_source)
@@ -432,3 +441,4 @@ db_insert_hobo <- function() {
     }
   })
 }
+
