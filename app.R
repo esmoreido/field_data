@@ -157,7 +157,7 @@ ui <- dashboardPage(
                   div(style = "display:block;", 
                       actionButton("plot_graph", "Создать", icon = icon("chart-line")),
                       downloadButton('download',"Скачать таблицу"),
-                      actionButton("reset2", "Очистить"))
+                      actionButton("reset2", "Очистить", icon = icon("broom")))
                 ),
                 wellPanel(
                   # div(style='overflow: scroll; max-height: 600px', 
@@ -192,7 +192,7 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output, session) {
-  source('c:/Users/morey/Documents/R/field_data/source/helpers_funs.R', local = T, encoding = 'UTF-8')
+  source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2,input$reset3, input$reset4), {
@@ -436,6 +436,10 @@ server <- function(input, output, session) {
                                                width = 'auto', 
                                                height = 200) %>% 
                         dyRangeSelector() %>%
+                        dyAxis("x", label = "Дата", 
+                               valueFormatter = jsValueFormatter(),
+                               rangePad=5) |>
+                        dyAxis("y", drawGrid = FALSE) %>%
                         dyOptions(colors = RColorBrewer::brewer.pal(3, "Set2")))
         # print(lst)
         res <- htmltools::tagList(lst)

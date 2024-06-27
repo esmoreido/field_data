@@ -442,3 +442,14 @@ db_insert_hobo <- function() {
   })
 }
 
+
+
+# форматирование даты для dygraphs
+jsValueFormatter <- function() {
+    f <- "function(ms) {
+          var today  = new Date(ms);
+          var options = { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' };
+          return(today.toLocaleDateString(\"ru-RU\", options));
+   }"
+    return(f)
+}
