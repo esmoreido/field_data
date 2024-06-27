@@ -151,6 +151,7 @@ ui <- dashboardPage(
                   div(style = stl, uiOutput('ui_var')),
                   div(style = stl, selectInput('aggregate', 'Осреднение', width = '250px',
                                                choices = c('Без осреднения'='none', '1 час'='1 hour', 
+                                                           '6 часов'='6 hours', '12 часов'='12 hours',
                                                            '1 день'='1 day', '1 неделя'='1 week', 
                                                            '1 месяц'='1 month', '1 год'='1 year'))),
                   div(style = "display:block;", 
@@ -452,7 +453,7 @@ server <- function(input, output, session) {
   output$download <- downloadHandler(
     filename = function(){"krymdata_output.csv"}, 
     content = function(fname){
-      write.csv(plot_df(), 
+      write.table(plot_df(), 
                 fname, sep = ";", quote = F, row.names = F, na = '-32968')
     }
   )
