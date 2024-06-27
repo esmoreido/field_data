@@ -1,215 +1,292 @@
 library(shiny)
 library(shinyjs)
+library(shinydashboard)
 library(shinyWidgets)
-library(stringi)
-library(dplyr)
-# library(ggplot2)
-library(dygraphs)
-library(lubridate)
-library(RPostgreSQL)
-library(tidyverse)
-library(DT)
-library(readxl)
-library(htmltools)
-library(xts)
-# library(reshape2)
 library(leaflet)
+library(dygraphs)
+library(htmltools)
+library(RPostgreSQL)
+library(DT)
+library(xts)
 stl <- "display:inline-block; vertical-align:top"
 
-
-# UI Основной контейнер приложения ----
-ui <- navbarPage(id = 'mainpanel', title = "КрымДанные", 
-                 footer = div(class = "footer", includeHTML("footer.html")), 
-                 fluid = T, windowTitle = "КрымДанные", lang = "ru",
-                 
-                 # Панель загрузки данных с метеостанций ----
-                 tabPanel(title = "Загрузка с метеостанции",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            
-                            # App title 
-                            titlePanel("Загрузка файлов с метеостанций"),
-                                wellPanel(id = 'inputFile',
-                                          # Input: Select a file 
-                                div(style = stl, fileInput("file1", "Выбрать файл",
-                                          multiple = FALSE, width = '350px',
-                                          accept = c("text/csv",
-                                                     "text/comma-separated-values,text/plain",
-                                                     ".csv"),
-                                          buttonLabel = "Выбрать...",
-                                          placeholder = "Файл не выбран")),
-                                div(style = stl, uiOutput('ui_st_import')),
-                                checkboxInput(inputId = "amdate", 
-                                              label = "Американский формат даты и времени мм/дд/гг 12 ч.", 
-                                              value = F
-                                ),
-                                checkboxInput(inputId = "amunit", 
-                                              label = "Американские единицы (°F, in.)", 
-                                              value = F
-                                ), 
-                                checkboxInput(inputId = "pres_mm", 
-                                              label = "мБар в мм.рт.ст.", 
-                                              value = F
-                                ),
-                                checkboxInput(inputId = "soil_data", 
-                                              label = "Есть температура и влажность почвы", 
-                                              value = F
-                                ),
-                                # Horizontal line 
-                                tags$hr(),
-                                
-                                # Insert button 
-                                actionButton("insert_df", "Загрузить"),
-                                actionButton("reset1", "Очистить"),
-                                h2(textOutput("qry", inline = T))
-                                ),
-                            wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
-                                # Вывод таблицы и результатов добавления ----
-                                div(h3(textOutput('weather_warning'))),
-                                div(dataTableOutput("contents"), style = "font-size:80%")
-                                )
+ui <- dashboardPage(
+  dashboardHeader(title = "Field2DB"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Обзор", tabName = "dashboard", icon = icon("map-location-dot")),
+      menuItem("Загрузка", tabName = "upload", icon = icon("arrow-up-from-bracket")),
+      menuItem("Просмотр", tabName = "explore", icon = icon("chart-line")),
+      menuItem("Обслуживание", tabName = "edit", icon = icon("cog"))
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      # дэшборд ----
+      tabItem("dashboard",
+              fluidRow(
+                valueBoxOutput("rate"),
+                valueBoxOutput("count"),
+                valueBoxOutput("users")
+              ),
+              fluidRow(
+                box(title = 'Карта расположения станций и постов', leafletOutput('stations_map')),
+                box(title = "Перечень станций",
+                    div(style = "overflow-y:scroll; max-height: 400px",
+                        dataTableOutput("st_table")))
+              ),
+              # fluidRow(
+              #   box(title = 'Количество данных', dataTableOutput('nval_table'))
+              # )
+      ),
+      # загрузка ----
+      tabItem("upload",
+              tabsetPanel(
+                # метеостанции ----
+                tabPanel(title = "Загрузка с метеостанции", icon = icon("cloud-sun-rain"),
+                         fluidPage(
+                           shinyjs::useShinyjs(),
+                           shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                           titlePanel("Загрузка файлов с метеостанций"),
+                           wellPanel(id = 'inputFile', 
+                                     div(style = stl, fileInput("file1", "Выбрать файл",
+                                                                multiple = FALSE, width = '350px',
+                                                                accept = c("text/csv",
+                                                                           "text/comma-separated-values,text/plain",
+                                                                           ".csv"),
+                                                                buttonLabel = "Выбрать...",
+                                                                placeholder = "Файл не выбран")),
+                                     div(style = stl, uiOutput('ui_st_import')),
+                                     checkboxInput(inputId = "amdate", 
+                                                   label = "Формат даты и времени мм/дд/гг 12 ч.", 
+                                                   value = F
+                                     ),
+                                     checkboxInput(inputId = "amunit", 
+                                                   label = "Неметрические единицы (°F, in.)", 
+                                                   value = F
+                                     ), 
+                                     checkboxInput(inputId = "pres_mm", 
+                                                   label = "мБар в мм.рт.ст.", 
+                                                   value = F
+                                     ),
+                                     checkboxInput(inputId = "soil_data", 
+                                                   label = "Есть температура и влажность почвы", 
+                                                   value = F
+                                     ),
+                                     # Horizontal line 
+                                     tags$hr(),
+                                     
+                                     # Insert button 
+                                     actionButton("insert_df", "Загрузить"),
+                                     actionButton("reset1", "Очистить"),
+                                     h2(textOutput("qry", inline = T))
+                           ),
+                           wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
+                                     # Вывод таблицы и результатов добавления ----
+                                     div(h3(textOutput('weather_warning'))),
+                                     div(dataTableOutput("contents"), style = "font-size:80%")
+                           )
+                           
+                           
+                         )),
+                # гидропосты ----
+                tabPanel(
+                  title = "Загрузка с логгеров HOBO", icon = icon("water"),
+                  fluidPage(
+                    shinyjs::useShinyjs(),
+                    shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                    titlePanel("Загрузка с логгеров HOBO"),
+                    wellPanel(id = 'inputFileHobo',
+                              div(style = stl, 
+                                  fileInput("file2", "Выбрать файл",
+                                            multiple = FALSE, width = '350px',
+                                            accept = c("text/csv",".xlsx",
+                                                       "text/comma-separated-values,text/plain",
+                                                       ".csv",
+                                                       ".xlsx"),
+                                            buttonLabel = "Выбрать...",
+                                            placeholder = "Файл не выбран")),
+                              div(style = stl, 
+                                  uiOutput('ui_hobo_import')),
+                              div(radioButtons(inputId = "hobo_data_type",
+                                               label = "Вид логгера", inline = T,
+                                               choices = c('Давление'='1', 'Электропроводность'='2'))),
+                              div(radioButtons(inputId = "hobo_xls",
+                                               label = "Формат файла", inline = T,
+                                               choices = c('txt/csv'='2', 'excel'='1'))),
+                              div(checkboxInput(inputId = 'ninecol',  value = 0, 
+                                                label = 'В файле 9 колонок данных')),
+                              div(style = stl, checkboxInput(inputId = 'hobo_header',  value = 0, 
+                                                             label = 'Есть первая строка с номером (Plot Title: XXXXXXX)')),
+                              # Horizontal line 
+                              tags$hr(),
                               
-                            
-                          )
-                 ),
-                 # Панель загрузки данных с логгеров HOBO ----
-                 tabPanel(title = "Загрузка с логгеров HOBO",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            
-                            # App title 
-                            titlePanel("Загрузка с логгеров HOBO"),
-                            wellPanel(id = 'inputFileHobo',
-                                      div(style = stl, 
-                                          fileInput("file2", "Выбрать файл",
-                                                                 multiple = FALSE, width = '350px',
-                                                                 accept = c("text/csv",".xlsx",
-                                                                            "text/comma-separated-values,text/plain",
-                                                                            ".csv",
-                                                                            ".xlsx"),
-                                                                 buttonLabel = "Выбрать...",
-                                                                 placeholder = "Файл не выбран")),
-                                      div(style = stl, 
-                                          uiOutput('ui_hobo_import')),
-                                      div(radioButtons(inputId = "hobo_data_type",
-                                                    label = "Вид логгера", inline = T,
-                                                   choices = c('Давление'='1', 'Электропроводность'='2'))),
-                                      div(radioButtons(inputId = "hobo_xls",
-                                                                    label = "Формат файла", inline = T,
-                                                                    choices = c('txt/csv'='2', 'excel'='1'))),
-                                      div(style = stl, checkboxInput(inputId = 'ninecol',  value = 0, 
-                                                                     label = 'В файле 9 колонок данных')),
-                                      div(style = stl, checkboxInput(inputId = 'hobo_header',  value = 0, 
-                                                                     label = 'Есть первая строка с номером (Plot Title: XXXXXXX)')),
-                            # Horizontal line 
-                            tags$hr(),
-                                      
-                                      # Insert button 
-                                      actionButton("insert_hobo_df", "Загрузить"),
-                                      actionButton("reset4", "Очистить"),
-                                      h2(textOutput("qry_hobo", inline = T))
-                            ),
-                            wellPanel(id = 'mainTable', 
-                                      h3(textOutput('hobo_warning')),
-                                      # Вывод таблицы и результатов добавления c HOBO ----
-                                      div(style = "overflow-y:scroll; max-height: 600px",
-                                          DTOutput("contents_hobo"), 
-                                          style = "font-size:80%")
-                            )
-                            
-                            
-                          )
-                 ),
-                 
-                 # Панель графика ----
-                 tabPanel(title = "Просмотр",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            
-                            # Заголовок
-                            titlePanel("Просмотр данных"),
-                            wellPanel(
-                                div(style = stl, uiOutput('ui_stations')),
-                                div(style = stl, uiOutput('ui_var')),
-                                # div(style = stl, 
-                                #     selectInput("group", width = '250px', selectize = T, "Группировка", 
-                                #             choices = c('Без группировки'='nogroup', 
-                                #                         'По переменным'='group_var', 
-                                #                         'По станциям'='group_stat'))),
-                                div(style = "display:block;", 
-                                    actionButton("plot_graph", "Создать"),
-                                    downloadButton('download',"Скачать таблицу"),
-                                actionButton("reset2", "Очистить"))
-                              ),
-                              wellPanel(
-                                # div(style='overflow: scroll; max-height: 600px', 
-                                #     plotOutput('plotdata')),
-                                div(style='overflow: scroll', 
-                                    htmlOutput('plotdata')),
-                                div(dataTableOutput("datatable"), style = "font-size:80%; overflow-y:scroll; max-height: 600px")
-                              )
-                            )
-                 ),
-                 
-                 # Панель перечня станций и постов ----
-                 tabPanel(title = "Станции",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            verticalLayout(
-                              titlePanel("Объекты наблюдательной сети"),
-                              leafletOutput("stations_map"),
-                              wellPanel(
-                                div(dataTableOutput("st_table"), style = "font-size:80%")
-                              ),
-                              wellPanel(
-                                div(dataTableOutput("nval_table"), style = "font-size:80%")
-                              )
-                            )
-                          )
-                          
-                          
-                          
-                 ),
-                 # Панель удаления записей ----
-                 tabPanel(id = 'deltab', title = "Редактирование",
-                          fluidPage(
-                            shinyjs::useShinyjs(),
-                            shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
-                            verticalLayout(
-                              titlePanel("Редактирование записей"),
-                              tags$p('Выберите строку таблицы для удаления записей и нажмите \"Удалить\", после этого нажмите \"Обновить\" и вернитесь на эту вкладку'),
-                              # wellPanel(
-                                div(DT::dataTableOutput('delete_table'),
-                                    style = "font-size:80%"),
-                                # verbatimTextOutput('delete_table_selection'),
-                              div(actionButton("delete_records_source", "Удалить"),
-                              actionButton("reset3", "Обновить")),
-                              textOutput("deleted_records", inline = T)
-                              # )
-                            )
-                          )
-                          
-                          
-                          
-                 ),
+                              # Insert button 
+                              actionButton("insert_hobo_df", "Загрузить"),
+                              actionButton("reset4", "Очистить"),
+                              h2(textOutput("qry_hobo", inline = T))
+                    ),
+                    wellPanel(id = 'mainTable', 
+                              h3(textOutput('hobo_warning')),
+                              # Вывод таблицы и результатов добавления c HOBO ----
+                              div(style = "overflow-y:scroll; max-height: 600px",
+                                  DTOutput("contents_hobo"), 
+                                  style = "font-size:80%")
+                    )
+                    
+                    
+                  )
+                ))
+      ),
+      # просмотр ----
+      tabItem("explore",
+              fluidPage(
+                shinyjs::useShinyjs(),
+                shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                
+                # Заголовок
+                titlePanel("Просмотр данных"),
+                wellPanel(
+                  div(style = stl, uiOutput('ui_stations')),
+                  div(style = stl, uiOutput('ui_var')),
+                  div(style = stl, selectInput('aggregate', 'Осреднение', width = '250px',
+                                               choices = c('Без осреднения'='none', '1 час'='1 hour', 
+                                                           '1 день'='1 day', '1 неделя'='1 week', 
+                                                           '1 месяц'='1 month', '1 год'='1 year'))),
+                  div(style = "display:block;", 
+                      actionButton("plot_graph", "Создать", icon = icon("chart-line")),
+                      downloadButton('download',"Скачать таблицу"),
+                      actionButton("reset2", "Очистить"))
+                ),
+                wellPanel(
+                  # div(style='overflow: scroll; max-height: 600px', 
+                  #     plotOutput('plotdata')),
+                  div(style='overflow: scroll', 
+                      htmlOutput('plotdata')),
+                  div(dataTableOutput("datatable"), style = "font-size:80%; overflow-y:scroll; max-height: 600px")
+                )
+              )
+      ),
+      # обслуживание ----
+      tabItem("edit",
+              fluidPage(
+                shinyjs::useShinyjs(),
+                shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
+                verticalLayout(
+                  titlePanel("Редактирование записей"),
+                  tags$p('Выберите строку таблицы для удаления записей и нажмите \"Удалить\", после этого нажмите \"Обновить\" и вернитесь на эту страницу.'),
+                  # wellPanel(
+                  div(DT::dataTableOutput('delete_table'),
+                      style = "font-size:80%"),
+                  # verbatimTextOutput('delete_table_selection'),
+                  div(actionButton("delete_records_source", "Удалить"),
+                      actionButton("reset3", "Обновить")),
+                  textOutput("deleted_records", inline = T)
+                  # )
+                )
+              )
+      )
+    )
+  )
 )
 
-
-# Сервер ----
 server <- function(input, output, session) {
-  source('source/helpers_funs.R', local = T, encoding = 'UTF-8')
-  
-  # соединение с БД
-  con <- db_connect('pwd.txt')
+  source('c:/Users/morey/Documents/R/field_data/source/helpers_funs.R', local = T, encoding = 'UTF-8')
   
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2,input$reset3, input$reset4), {
     shinyjs::js$refresh_page()
   }, ignoreNULL = T, ignoreInit = T)  
+  
+  # Соединение с БД ----
+  con <- db_connect('c:/Users/morey/Documents/R/field_data/pwd.txt')
+  
+  # Таблица станций ----
+  stations_df <- reactive({
+    q <- gsub("[\r\n\t]", "", 
+              "SELECT fs.name, ft.type, fs.lon, fs.lat, fs.elev, fs.date_open
+      FROM field_site fs
+      LEFT JOIN field_device_type ft ON fs.type = ft.id
+              ORDER BY ft.type")
+    pts <- dbGetQuery(con, q)
+    return(pts)
+  })
+  
+  # Верхние картинки ----
+  output$rate <- renderValueBox({
+    valueBox(
+      value = nrow(stations_df()),
+      subtitle = "Количество станций в БД",
+      icon = icon("area-chart"),
+      # color = if (downloadRate >= input$rateThreshold) "yellow" else "aqua"
+    )
+  })
+  
+  output$count <- renderValueBox({
+    valueBox(
+      value = 50,
+      subtitle = "Total downloads",
+      icon = icon("download")
+    )
+  })
+  
+  output$users <- renderValueBox({
+    valueBox(
+      value = 10,
+      "Unique users",
+      icon = icon("users")
+    )
+  })
+  
+  
+  # Таблица с перечнем станций ----
+  output$st_table <- renderDT(stations_df(), 
+                              colnames = c('Название', 'Тип', 'Долгота, °', 
+                                           'Широта, °', 'Высота, м', 
+                                           'Дата открытия'),
+                              options = list(pageLength = 25,
+                                             language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+  
+  # # Виджет с количеством данных наблюдений по станциям ----
+  # nval_df <- reactive({
+  #   q <- gsub("[\r\n\t]", "",
+  #             "SELECT DISTINCT fs.name, fv.var_name,
+  #         count(fd.value) as nval,
+  #         min(fd.datetime) as start,
+  #         max(fd.datetime) as end
+  #         FROM field_data fd
+  #         LEFT JOIN field_site fs ON fd.station::integer=fs.id
+  #         LEFT JOIN field_var_unit fv ON fd.variable::integer=fv.id
+  #         GROUP BY fv.var_name, fs.name
+  #         ORDER BY fv.var_name")
+  #   return(df <- dbGetQuery(con, q))
+  # })
+  # 
+  # output$nval_table <- renderDT(nval_df(),
+  #                               colnames = c('Станция', 'Показатель', 'Число',
+  #                                            'Начало', 'Окончание'),
+  #                               options = list(pageLength = 25,
+  #                                              language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+  
+  
+  # Виджет с картой расположения станций (пока не работает на сервере) ----
+  
+  output$stations_map <- renderLeaflet({
+    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+    leaflet(stations_df()) %>%
+      addTiles() %>%
+      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+                       label = ~name, labelOptions = labelOptions(noHide = T),
+                       fillColor = ~typepal(type),
+                       stroke = F) %>%
+      leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
+                         labels = c('Метеостанции', 'Гидропосты'))
+  })
+  
+  
+  # Панель загрузки данных ----
+  
+  # Метеоданные ----
   
   # Получение из БД списка метеостанций для добавления в таблицу ----
   output$ui_st_import <- get_weather_station_list_selectInput(1, F, 'station_id')
@@ -218,10 +295,10 @@ server <- function(input, output, session) {
   input_df <- reactive({
     req(input$file1)
     output$weather_warning <- validate(need(tools::file_ext(input$file1$datapath) == c("csv", "txt", "asc"), 
-                  "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
-             need(input$station_id != '', 'Выберите название станции!')
+                                            "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
+                                       need(input$station_id != '', 'Выберите название станции!')
     )
-
+    
     tryCatch(
       {
         df <- read.weatherlink() # Внешняя функция чтения файла Davis
@@ -245,6 +322,7 @@ server <- function(input, output, session) {
     
   })
   
+  # Гидроданные ----
   # Получение из БД списка логгеров для добавления в таблицу ----
   output$ui_hobo_import <- get_weather_station_list_selectInput(2, F, 'station_hobo_id')
   
@@ -253,8 +331,8 @@ server <- function(input, output, session) {
     req(input$file2)
     
     output$hobo_warning <- validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc"), 
-                                            "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
-                                       need(input$station_hobo_id != '', 'Выберите название станции!')
+                                         "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
+                                    need(input$station_hobo_id != '', 'Выберите название станции!')
     )
     
     tryCatch(
@@ -288,9 +366,9 @@ server <- function(input, output, session) {
   
   # Таблица для графика и вывода ----
   plot_df <- reactive({
-    req(input$ui_stations, input$pick_var)
-    print(input$pick_var)
-    print(input$ui_stations)
+    req(input$ui_stations, input$pick_var, input$aggregate)
+    # print(input$pick_var)
+    # print(input$ui_stations)
     q <- gsub("[\r\n\t]", "", 
               paste0("SELECT field_data.datetime, field_site.name, 
                 field_var_unit.var_name, field_data.value 
@@ -310,29 +388,48 @@ server <- function(input, output, session) {
     },
     error = function(e) return(e)
     )
-    return(df)
+    
+    # аггрегация данных ----
+    print(input$aggregate)
+    if(input$aggregate != 'none'){
+      df <- df %>%
+        group_by(name, var_name, datetime = lubridate::floor_date(datetime, input$aggregate)) %>%
+        summarise(value = case_when(
+          any(var_name == 'Rain') ~ sum(value),
+          any(var_name != 'Rain') ~ mean(value),
+          .default = mean(value))) %>%
+        pivot_wider(id_cols = datetime,  
+                    names_from = c('name', 'var_name'), names_sep = '_', 
+                    values_from = 'value') %>%
+        mutate(across(where(is.numeric), round, 3))
+    }else{
+      df <- df %>%
+        pivot_wider(id_cols = datetime,  
+                    names_from = c('name', 'var_name'), names_sep = '_', 
+                    values_from = 'value') %>%
+        mutate(across(where(is.numeric), round, 3))
+    }
     print(head(df))
+    return(df)
+    # print(head(df))
   })
+  
+  
   
   # График ----
   observeEvent(input$plot_graph, {
     output$plotdata <- renderUI({
       withProgress(expr = {
-        
-            df <- pivot_wider(data = plot_df(), id_cols = datetime,  
-                              names_from = c('name', 'var_name'), names_sep = '_', 
-                              values_from = 'value')
-          print(head(df))
-            tryCatch({
-                ts <- as.xts(df[,-1], 
-                             order.by = as.POSIXct(df$datetime, 
-                                                   format = "%Y-%m-%d %H:%M:%S"))
-              }, warning = function(war){
-                print(paste("Предупреждение:  ", err))
-              }, error = function(e){
-                print(paste("Ошибка:  ", err))
-                stop(safeError(e))
-              })
+        df <- plot_df()
+        # tryCatch({
+        ts <- as.xts(df[,-1], 
+                     order.by = as.POSIXct(df$datetime))
+        # }, warning = function(war){
+        #   print(paste("Предупреждение:  ", war))
+        # }, error = function(e){
+        #   print(paste("Ошибка:  ", e))
+        #   stop(safeError(e))
+        # })
         lst <- lapply(ts, function (x) dygraph(x, main = colnames(x), 
                                                group = 'plots', 
                                                width = 'auto', 
@@ -342,13 +439,11 @@ server <- function(input, output, session) {
         # print(lst)
         res <- htmltools::tagList(lst)
         return(res)
-        }, message = "Загрузка...")
+      }, message = "Загрузка...")
     })
     # Вывод ----
     output$datatable <- renderDataTable(
-      plot_df() %>%
-        pivot_wider(id_cols = 'datetime', names_from = c('name', 'var_name'), 
-                    values_from = 'value'),
+      plot_df(),
       options = list(pageLength = 100, 
                      language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json"))
     )
@@ -357,69 +452,11 @@ server <- function(input, output, session) {
   output$download <- downloadHandler(
     filename = function(){"krymdata_output.csv"}, 
     content = function(fname){
-      write.csv(pivot_wider(plot_df(), id_cols = 'datetime',
-                            names_from = c('name', 'var_name'), 
-                            values_from = 'value'), 
+      write.csv(plot_df(), 
                 fname, sep = ";", quote = F, row.names = F, na = '-32968')
     }
   )
-  # Карта и таблица станций ----
-  stations_df <- reactive({
-    q <- gsub("[\r\n\t]", "", 
-              "SELECT fs.name, ft.type, fs.lon, fs.lat, fs.elev, fs.date_open, fs.date_closed
-      FROM field_site fs
-      LEFT JOIN field_device_type ft ON fs.type = ft.id
-              ORDER BY ft.type")
-    pts <- dbGetQuery(con, q)
-    return(pts)
-  })
-
-  # Таблица с перечнем станций ----
-  output$st_table <- renderDT(stations_df(), 
-                              colnames = c('Название', 'Тип', 'Долгота, °', 
-                                           'Широта, °', 'Высота, м', 
-                                           'Дата открытия', 'Дата закрытия'),
-                                  options = list(pageLength = 25,
-                                                 language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   
-  # Виджет с количеством данных наблюдений по станциям ----
-  nval_df <- reactive({
-    q <- gsub("[\r\n\t]", "", 
-              "SELECT DISTINCT fs.name, fv.var_name, 
-          count(fd.value) as nval, 
-          min(fd.datetime) as start, 
-          max(fd.datetime) as end
-          FROM field_data fd 
-          LEFT JOIN field_site fs ON fd.station::integer=fs.id  
-          LEFT JOIN field_var_unit fv ON fd.variable::integer=fv.id
-          GROUP BY fv.var_name, fs.name
-          ORDER BY fv.var_name")
-    return(dbGetQuery(con, q))
-  })
-  
-  output$nval_table <- renderDT(nval_df(),
-                                colnames = c('Станция', 'Показатель', 'Число', 
-                                             'Начало', 'Окончание'),
-                                options = list(pageLength = 25,
-                                               language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
-  
-  # Виджет с картой расположения станций (пока не работает на сервере) ----
-  output$stations_map <- renderLeaflet({
-    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
-    leaflet(stations_df()) %>%
-      addTiles() %>%
-      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-                       label = ~name, labelOptions = labelOptions(noHide = T),
-                       fillColor = ~typepal(type),
-                       stroke = F,
-                       clusterOptions = markerClusterOptions()) %>%
-      addLegend(colors = c('red', 'blue'), values = ~type, title = '', opacity = 1,
-                labels = c('Метеостанции', 'Гидропосты'))
-  })
-
-  
-  
-
   # Таблица с перечнем станций и источников для удаления ----
   stations_source <- reactive({
     q <- gsub("[\r\n\t]", "", 
@@ -436,10 +473,10 @@ server <- function(input, output, session) {
   
   output$delete_table <- renderDT(stations_source(), server = FALSE, 
                                   selection = 'single',
-                                  colnames = c('Дата добавления', 'Источник', 'Станция', 'Кол-во записей'),
-                                           options = list(pageLength = 25,
-                                                          language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
-
+                                  colnames = c('Дата добавления', 'Источник', 'Станция', 'Добавлено записей'),
+                                  options = list(pageLength = 25,
+                                                 language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
+  
   # Удаление данных по нажатию кнопки ----
   observeEvent(input$delete_records_source, {
     q <- paste0("DELETE FROM field_data WHERE source = \'", 
@@ -453,15 +490,12 @@ server <- function(input, output, session) {
     output$deleted_records <- renderText(paste0("Из базы удалено ", res, " записей."))
   })
   
-  
   # Разрыв соединения с БД ----
   session$onSessionEnded(function() {
     #   lapply(dbListConnections(drv = dbDriver("PostgreSQL")), function(x) {dbDisconnect(conn = x)})
     dbDisconnect(con)
     print('Disconnected')
   })
-  
- 
 }
-# Выполнение приложения ----
+
 shinyApp(ui, server)
