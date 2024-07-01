@@ -1,0 +1,23 @@
+.sticky_footer {    
+  position:fixed;    
+  bottom:0;    
+  right:0;    
+  left:0;    
+  background:#3c8dbc;    
+  z-index: 1000;    
+  opacity: 1; 
+},
+.sidebarfooter {
+  position:static;  
+  top: 2;
+  bottom:2;    
+  right:2;    
+  left:2; 
+  align-content: center;
+  background:#3c8dbc;    
+  z-index: 1000;    
+  opacity: 1
+}
+.mainRow {
+  height:40vh;
+}

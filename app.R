@@ -10,34 +10,39 @@ library(DT)
 library(xts)
 stl <- "display:inline-block; vertical-align:top"
 
-ui <- dashboardPage(
+ui <- dashboardPage(skin = 'red', 
   dashboardHeader(title = "Field2DB"),
   dashboardSidebar(
     sidebarMenu(
-      menuItem("Обзор", tabName = "dashboard", icon = icon("map-location-dot")),
+      menuItem("Обзор", tabName = "dashboard", icon = icon("map-location-dot")), # fontawesome.com
       menuItem("Загрузка", tabName = "upload", icon = icon("arrow-up-from-bracket")),
       menuItem("Просмотр", tabName = "explore", icon = icon("chart-line")),
-      menuItem("Обслуживание", tabName = "edit", icon = icon("cog"))
+      menuItem("Обслуживание", tabName = "edit", icon = icon("cog")),
+      tags$div(class = 'sticky_footer', 
+               tags$a(href="href=\"https://www.iwp.ru/about/structure/otdel-gidrologii-rechnykh-basseynov/laboratoriya-gidrologii-navodneniy/\"", 
+                      HTML("&copy; 2023-24 Лаборатория 
+                      гидроинформатики
+                      ИВП РАН"))
+      )
     )
   ),
   dashboardBody(
+    includeCSS("www/field_data.css"),
     tabItems(
       # дэшборд ----
       tabItem("dashboard",
               fluidRow(
-                valueBoxOutput("rate"),
-                valueBoxOutput("count"),
+                valueBoxOutput("num_stat"),
+                valueBoxOutput("dbsize"),
                 valueBoxOutput("users")
               ),
               fluidRow(
-                box(title = 'Карта расположения станций и постов', leafletOutput('stations_map')),
-                box(title = "Перечень станций",
-                    div(style = "overflow-y:scroll; max-height: 400px",
-                        dataTableOutput("st_table")))
+                box(title = 'Карта расположения станций и постов', 
+                    solidHeader = TRUE, height = 'auto',
+                    leafletOutput('stations_map')),
+                box(title = "Перечень станций", solidHeader = TRUE,
+                    dataTableOutput("st_table"))
               ),
-              # fluidRow(
-              #   box(title = 'Количество данных', dataTableOutput('nval_table'))
-              # )
       ),
       # загрузка ----
       tabItem("upload",
@@ -77,8 +82,8 @@ ui <- dashboardPage(
                                      tags$hr(),
                                      
                                      # Insert button 
-                                     actionButton("insert_df", "Загрузить"),
-                                     actionButton("reset1", "Очистить"),
+                                     actionButton("insert_df", "Загрузить", icon = icon("arrow-up-from-bracket")),
+                                     actionButton("reset1", "Очистить",icon = icon("broom")),
                                      h2(textOutput("qry", inline = T))
                            ),
                            wellPanel(id = 'mainTable', style = "overflow-y:scroll; max-height: 600px",
@@ -122,7 +127,7 @@ ui <- dashboardPage(
                               tags$hr(),
                               
                               # Insert button 
-                              actionButton("insert_hobo_df", "Загрузить"),
+                              actionButton("insert_hobo_df", "Загрузить", icon = icon("arrow-up-from-bracket")),
                               actionButton("reset4", "Очистить"),
                               h2(textOutput("qry_hobo", inline = T))
                     ),
@@ -180,8 +185,8 @@ ui <- dashboardPage(
                   div(DT::dataTableOutput('delete_table'),
                       style = "font-size:80%"),
                   # verbatimTextOutput('delete_table_selection'),
-                  div(actionButton("delete_records_source", "Удалить"),
-                      actionButton("reset3", "Обновить")),
+                  div(actionButton("delete_records_source", "Удалить", icon = icon('broom')),
+                      actionButton("reset3", "Обновить", icon = icon('arrows-rotate'))),
                   textOutput("deleted_records", inline = T)
                   # )
                 )
@@ -214,7 +219,7 @@ server <- function(input, output, session) {
   })
   
   # Верхние картинки ----
-  output$rate <- renderValueBox({
+  output$num_stat <- renderValueBox({
     valueBox(
       value = nrow(stations_df()),
       subtitle = "Количество станций в БД",
@@ -223,18 +228,18 @@ server <- function(input, output, session) {
     )
   })
   
-  output$count <- renderValueBox({
+  output$dbsize <- renderValueBox({
     valueBox(
-      value = 50,
-      subtitle = "Total downloads",
+      value = getDbStats(con)[[1]],
+      subtitle = "Текущий объем БД",
       icon = icon("download")
     )
   })
   
   output$users <- renderValueBox({
     valueBox(
-      value = 10,
-      "Unique users",
+      value = getDbStats(con)[[2]],
+      "Уникальных записей в БД",
       icon = icon("users")
     )
   })
@@ -248,40 +253,21 @@ server <- function(input, output, session) {
                               options = list(pageLength = 25,
                                              language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
   
-  # # Виджет с количеством данных наблюдений по станциям ----
-  # nval_df <- reactive({
-  #   q <- gsub("[\r\n\t]", "",
-  #             "SELECT DISTINCT fs.name, fv.var_name,
-  #         count(fd.value) as nval,
-  #         min(fd.datetime) as start,
-  #         max(fd.datetime) as end
-  #         FROM field_data fd
-  #         LEFT JOIN field_site fs ON fd.station::integer=fs.id
-  #         LEFT JOIN field_var_unit fv ON fd.variable::integer=fv.id
-  #         GROUP BY fv.var_name, fs.name
-  #         ORDER BY fv.var_name")
-  #   return(df <- dbGetQuery(con, q))
-  # })
-  # 
-  # output$nval_table <- renderDT(nval_df(),
-  #                               colnames = c('Станция', 'Показатель', 'Число',
-  #                                            'Начало', 'Окончание'),
-  #                               options = list(pageLength = 25,
-  #                                              language = list(url = "https://cdn.datatables.net/plug-ins/1.10.19/i18n/Russian.json")))
-  
-  
-  # Виджет с картой расположения станций (пока не работает на сервере) ----
+ # Карта расположения станций (пока не работает на сервере) ----
   
   output$stations_map <- renderLeaflet({
+    wsh <- rgdal::readOGR('source/srtm_basp.shp')
     typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
     leaflet(stations_df()) %>%
       addTiles() %>%
       addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
                        label = ~name, labelOptions = labelOptions(noHide = T),
                        fillColor = ~typepal(type),
-                       stroke = F) %>%
+                       stroke = F, clusterOptions = 1) %>%
+      addPolygons(data = wsh) %>%
       leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
                          labels = c('Метеостанции', 'Гидропосты'))
+      
   })
   
   

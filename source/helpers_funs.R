@@ -285,6 +285,16 @@ db_connect <- function(f = 'pwd.txt') {
   return(con)
 }
 
+# запрос на размер таблиц ----
+getDbStats <- function(con){
+  q <- "SELECT pg_size_pretty( pg_total_relation_size('field_data'))"
+  fsize <- unlist(dbGetQuery(con, q))
+  q <- "SELECT count(value) FROM field_data"
+  nrows <- unlist(dbGetQuery(con, q))
+  nrows
+  return(list(fsize, nrows))
+}
+
 
 # запрос  на вставку в БД метеоданных ----
 db_insert_weather <- function() {
