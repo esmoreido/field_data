@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+.env
 
 pwd.txt
 db_service.R
