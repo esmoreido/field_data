@@ -8,6 +8,7 @@ library(htmltools)
 library(RPostgreSQL)
 library(DT)
 library(xts)
+library(terra)
 stl <- "display:inline-block; vertical-align:top"
 
 ui <- dashboardPage(skin = 'red', 
