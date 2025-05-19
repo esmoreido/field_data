@@ -17,13 +17,13 @@ ui <- dashboardPage(skin = 'red',
       menuItem("Обзор", tabName = "dashboard", icon = icon("map-location-dot")), # fontawesome.com
       menuItem("Загрузка", tabName = "upload", icon = icon("arrow-up-from-bracket")),
       menuItem("Просмотр", tabName = "explore", icon = icon("chart-line")),
-      menuItem("Обслуживание", tabName = "edit", icon = icon("cog")),
-      tags$div(class = 'sticky_footer', 
-               tags$a(href="href=\"https://www.iwp.ru/about/structure/otdel-gidrologii-rechnykh-basseynov/laboratoriya-gidrologii-navodneniy/\"", 
-                      HTML("&copy; 2023-24 Лаборатория 
-                      гидроинформатики
-                      ИВП РАН"))
-      )
+      menuItem("Обслуживание", tabName = "edit", icon = icon("cog"))
+      # tags$div(class = 'sticky_footer', 
+      #          tags$a(href="href=\"https://www.iwp.ru/about/structure/otdel-gidrologii-rechnykh-basseynov/laboratoriya-gidrologii-navodneniy/\"", 
+      #                 HTML("&copy; 2023-24 Лаборатория 
+      #                 гидроинформатики
+      #                 ИВП РАН"))
+      # )
     )
   ),
   dashboardBody(
