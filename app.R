@@ -39,7 +39,9 @@ ui <- dashboardPage(skin = 'red',
               fluidRow(
                 box(title = 'Карта расположения станций и постов', 
                     solidHeader = TRUE, height = 'auto',
-                    leafletOutput('stations_map')),
+                    # leafletOutput('stations_map')
+                    htmlOutput("stations_iframe_map")
+                    ),
                 box(title = "Перечень станций", solidHeader = TRUE,
                     dataTableOutput("st_table"))
               ),
@@ -255,21 +257,28 @@ server <- function(input, output, session) {
   
  # Карта расположения станций (пока не работает на сервере) ----
   
-  output$stations_map <- renderLeaflet({
-    wsh <- rgdal::readOGR('source/srtm_basp.shp')
-    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
-    leaflet(stations_df()) %>%
-      addTiles() %>%
-      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-                       label = ~name, labelOptions = labelOptions(noHide = T),
-                       fillColor = ~typepal(type),
-                       stroke = F, clusterOptions = 1) %>%
-      addPolygons(data = wsh) %>%
-      leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
-                         labels = c('Метеостанции', 'Гидропосты'))
-      
+  # output$stations_map <- renderLeaflet({
+  #   wsh <- rgdal::readOGR('source/srtm_basp.shp')
+  #   typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+  #   leaflet(stations_df()) %>%
+  #     addTiles() %>%
+  #     addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+  #                      label = ~name, labelOptions = labelOptions(noHide = T),
+  #                      fillColor = ~typepal(type),
+  #                      stroke = F, clusterOptions = 1) %>%
+  #     addPolygons(data = wsh) %>%
+  #     leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
+  #                        labels = c('Метеостанции', 'Гидропосты'))
+  #     
+  # })
+
+  # Карта расположения станций с nextgis.com ----
+  output$stations_iframe_map <- renderUI({
+    # map <- "<iframe src=\"https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=9&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=&panels=&base=basemap_0&lon=34.0000&lat=45.0087\" style=\"overflow:hidden;height:600px;width:800px\" height=\"600\" width=\"800\"></iframe>"
+    # HTML(gsub("URL",  url(description = 'iframe'), map))
+    tags$iframe(src ="https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=10&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=id&panels=layers%2Cidentify&base=basemap_0&lon=34.0000&lat=45.0087", 
+                          style="overflow:hidden;height:500px;width:700px", height="500", width="700")
   })
-  
   
   # Панель загрузки данных ----
   
