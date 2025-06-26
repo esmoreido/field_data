@@ -1,4 +1,4 @@
-Sys.setlocale(category = "LC_ALL", locale = "russian")
+Sys.setlocale(category = "LC_ALL")
 library(tidyverse)
 library(dbplyr)
 library(lubridate)
