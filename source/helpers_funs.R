@@ -1,4 +1,4 @@
-Sys.setlocale(category = "LC_ALL", locale = "Russian")
+Sys.setlocale(category = "LC_ALL")
 library(ggplot2)
 library(lubridate)
 library(dplyr)
