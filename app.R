@@ -8,6 +8,7 @@ library(htmltools)
 library(RPostgreSQL)
 library(DT)
 library(xts)
+
 stl <- "display:inline-block; vertical-align:top"
 
 ui <- dashboardPage(skin = 'red', 
@@ -274,8 +275,6 @@ server <- function(input, output, session) {
 
   # Карта расположения станций с nextgis.com ----
   output$stations_iframe_map <- renderUI({
-    # map <- "<iframe src=\"https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=9&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=&panels=&base=basemap_0&lon=34.0000&lat=45.0087\" style=\"overflow:hidden;height:600px;width:800px\" height=\"600\" width=\"800\"></iframe>"
-    # HTML(gsub("URL",  url(description = 'iframe'), map))
     tags$iframe(src ="https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=10&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=id&panels=layers%2Cidentify&base=basemap_0&lon=34.0000&lat=45.0087", 
                           style="overflow:hidden;height:500px;width:700px", height="500", width="700")
   })
