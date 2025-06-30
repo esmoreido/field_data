@@ -9,6 +9,9 @@ library(RPostgreSQL)
 library(DT)
 library(xts)
 
+options(shiny.trace=FALSE)
+options(shiny.fullstacktrace=FALSE)
+
 stl <- "display:inline-block; vertical-align:top"
 
 ui <- dashboardPage(skin = 'red', 
@@ -41,7 +44,7 @@ ui <- dashboardPage(skin = 'red',
                 box(title = 'Карта расположения станций и постов', 
                     solidHeader = TRUE, height = 'auto',
                     # leafletOutput('stations_map')
-                    # htmlOutput("stations_iframe_map")
+                    htmlOutput("stations_iframe_map")
                     ),
                 box(title = "Перечень станций", solidHeader = TRUE,
                     dataTableOutput("st_table"))
@@ -274,10 +277,10 @@ server <- function(input, output, session) {
   # })
 
   # Карта расположения станций с nextgis.com ----
-  # output$stations_iframe_map <- renderUI({
-  #   tags$iframe(src ="https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=10&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=id&panels=layers%2Cidentify&base=basemap_0&lon=34.0000&lat=45.0087", 
-  #                         style="overflow:hidden;height:500px;width:700px", height="500", width="700")
-  # })
+  output$stations_iframe_map <- renderUI({
+    tags$iframe(src ="https://wshydro.nextgis.com/resource/108/display/tiny?angle=0&zoom=10&styles=142%2C140%2C413%2C674&linkMainMap=true&events=false&panel=none&controls=id&panels=layers%2Cidentify&base=basemap_0&lon=34.0000&lat=45.0087",
+                          style="overflow:hidden;height:500px;width:700px", height="500", width="700")
+  })
   
   # Панель загрузки данных ----
   
