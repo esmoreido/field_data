@@ -53,7 +53,7 @@ ui <- dashboardPage(skin = 'red',
                 # метеостанции ----
                 tabPanel(title = "Загрузка с метеостанции", icon = icon("cloud-sun-rain"),
                          fluidPage(
-                           shinyjs::useShinyjs(),
+                            shinyjs::useShinyjs(),
                            # shinyjs::extendShinyjs(text = "shinyjs.refresh_page = function() { location.reload(); }", functions = "refresh_page"),
                            titlePanel("Загрузка файлов с метеостанций"),
                            wellPanel(id = 'inputFile', 
