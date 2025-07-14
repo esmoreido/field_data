@@ -1,0 +1,22 @@
+# Base R Shiny image
+FROM rocker/shiny
+
+# Make a directory in the container
+RUN mkdir /home/field_data
+
+# Install R dependencies
+RUN R -e "install.packages(c('dplyr', 'ggplot2', 'gapminder', 'shinyjs', 
+'shinydashboard', 'shinyWidgets', 'dygraphs', 'htmltools', 'RPostgreSQL',
+'DT', 'xts'))"
+
+# Copy the Shiny app code
+COPY app.R /home/field_data/app.R
+COPY source/helpers_funs.R /home/field_data/source/helpers_funs.R
+COPY footer.html /home/field_data/footer.html
+
+
+# Expose the application port
+EXPOSE 8180
+
+# Run the R Shiny app
+CMD Rscript /home/field_data/app.R
