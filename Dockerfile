@@ -5,7 +5,7 @@ FROM rocker/shiny-verse
 RUN mkdir /home/shiny-app
 
 # Install R dependencies
-RUN R -e "install.packages(c('dplyr', 'ggplot2', 'gapminder', 'shinyjs', 'shinydashboard', 'shinyWidgets', 'dygraphs', 'htmltools', 'RPostgreSQL', 'DT', 'xts'))"
+RUN R -e "install.packages(c('dplyr', 'ggplot2', 'shinyjs', 'shinydashboard', 'shinyWidgets', 'dygraphs', 'htmltools', 'RPostgreSQL', 'DT', 'xts'))"
 
 # Copy the Shiny app code
 COPY . /home/shiny-app/
