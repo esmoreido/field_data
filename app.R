@@ -2,7 +2,7 @@ library(shiny)
 library(shinyjs)
 library(shinydashboard)
 library(shinyWidgets)
-# library(leaflet)
+library(leaflet)
 library(dygraphs)
 library(htmltools)
 library(RPostgreSQL)
@@ -43,8 +43,8 @@ ui <- dashboardPage(skin = 'red',
               fluidRow(
                 box(title = 'Карта расположения станций и постов', 
                     solidHeader = TRUE, height = 'auto',
-                    # leafletOutput('stations_map')
-                    htmlOutput("stations_iframe_map")
+                    leafletOutput('stations_map')
+                    # htmlOutput("stations_iframe_map")
                     ),
                 box(title = "Перечень станций", solidHeader = TRUE,
                     dataTableOutput("st_table"))
@@ -262,20 +262,20 @@ server <- function(input, output, session) {
   
  # Карта расположения станций (пока не работает на сервере) ----
   
-  # output$stations_map <- renderLeaflet({
-  #   wsh <- rgdal::readOGR('source/srtm_basp.shp')
-  #   typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
-  #   leaflet(stations_df()) %>%
-  #     addTiles() %>%
-  #     addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
-  #                      label = ~name, labelOptions = labelOptions(noHide = T),
-  #                      fillColor = ~typepal(type),
-  #                      stroke = F, clusterOptions = 1) %>%
-  #     addPolygons(data = wsh) %>%
-  #     leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
-  #                        labels = c('Метеостанции', 'Гидропосты'))
-  #     
-  # })
+  output$stations_map <- renderLeaflet({
+    wsh <- rgdal::readOGR('source/srtm_basp.shp')
+    typepal <- colorFactor(palette = c('red', 'blue'), domain = stations_df()$type)
+    leaflet(stations_df()) %>%
+      addTiles() %>%
+      addCircleMarkers(lng = ~lon, lat = ~lat, fillOpacity = 1,
+                       label = ~name, labelOptions = labelOptions(noHide = T),
+                       fillColor = ~typepal(type),
+                       stroke = F, clusterOptions = 1) %>%
+      addPolygons(data = wsh) %>%
+      leaflet::addLegend(colors = c('blue','red'), values = ~type, title = '', opacity = 1,
+                         labels = c('Метеостанции', 'Гидропосты'))
+
+  })
 
   # Карта расположения станций с nextgis.com ----
   output$stations_iframe_map <- renderUI({
