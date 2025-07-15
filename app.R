@@ -211,7 +211,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Соединение с БД ----
-  con <- db_connect('c:/Users/morey/Documents/R/field_data/pwd.txt')
+  con <- db_connect()
   
   # Таблица станций ----
   stations_df <- reactive({
