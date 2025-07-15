@@ -14,4 +14,4 @@ COPY . /home/shiny-app/
 EXPOSE 8180
 
 # Run the R Shiny app
-CMD ["R", "-e", "shiny::runApp('/home/shiny-app')"]
+CMD ["R", "-e", "shiny::runApp('/home/shiny-app', host='0.0.0.0', port=8180)"]
