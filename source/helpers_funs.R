@@ -264,7 +264,7 @@ get_plot_vars <- function() {
 
 # функция соединения с базой данных ----
 db_connect <- function(f = 'pwd.txt') {
-  mypaw <- readLines(f)
+  mypaw <- readLines(f, warn = F)
   drv <- dbDriver("PostgreSQL")
   tryCatch({
     con <- dbConnect(
