@@ -204,7 +204,7 @@ ui <- dashboardPage(skin = 'red',
 
 server <- function(input, output, session) {
   source('source//helpers_funs.R', local = T, encoding = 'UTF-8')
-  print(list.files(getwd()))
+  
   # Перезагрузка приложения с кнопки ----
   observeEvent(c(input$reset1,input$reset2,input$reset3, input$reset4), {
     shinyjs::js$refresh_page()
