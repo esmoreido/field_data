@@ -211,6 +211,7 @@ server <- function(input, output, session) {
   }, ignoreNULL = T, ignoreInit = T)  
   
   # Соединение с БД ----
+  print(list.files(getwd()))
   con <- db_connect()
   
   # Таблица станций ----
