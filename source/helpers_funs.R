@@ -4,6 +4,7 @@ library(lubridate)
 library(dplyr)
 library(tidyverse)
 library(RPostgreSQL)
+library(readxl)
 
 # загрузка csv davis ----
 
@@ -149,21 +150,27 @@ read.hobo <- function() {
   }else{
     skipl <- 1
   }
-  # print('xls')
-  # print(input$hobo_xls)
+  print('xls')
+  print(input$hobo_xls)
   if(input$hobo_xls == '2'){
     hobo_df <- read.csv(file = filename, 
                         sep = ',',  encoding = 'UTF-8', header = F, skip = skipl,
                         col.names = coln)
-    if (grepl(".", hobo_df$datetime)) {
-      hobo_df <- hobo_df %>%
-        mutate(datetime = as.POSIXct(strptime(datetime, format = '%m.%d.%y %I:%M:%S %p')),
-               station_name = station_name) 
-    } else if (grepl("-", hobo_df$datetime)) {
-      hobo_df <- hobo_df %>%
-        mutate(datetime = as.POSIXct(strptime(datetime, format = '%m-%d-%y %I:%M:%S %p')),
-               station_name = station_name) 
-    }
+    print(hobo_df$datetime[1])
+    print(grepl(".", hobo_df$datetime[1]))
+    # форматирование даты в зависимости от обнаруженных разделителей и AM/PM
+    date_formatter <- case_when(
+      grepl(".", hobo_df$datetime[1]) == T & 
+        grepl("M", hobo_df$datetime[1]) == T ~ '%m.%d.%y %I:%M:%S %p',
+      grepl("-", hobo_df$datetime[1]) == T & 
+        grepl("M", hobo_df$datetime[1]) == T ~ '%m-%d-%y %I:%M:%S %p',
+      grepl(".", hobo_df$datetime[1]) == T & 
+        grepl("M", hobo_df$datetime[1]) == F ~ '%m.%d.%y %H:%M:%S',
+      .default = '%m-%d-%y %I:%M:%S %p'
+    )
+    hobo_df <- hobo_df %>%
+      mutate(datetime = as.POSIXct(strptime(datetime, format = date_formatter)),
+             station_name = station_name) 
   }else if (input$hobo_xls == '1'){
     hobo_df <- read_xlsx(path = filename, skip = skipl, 
                          col_types = colt,

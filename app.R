@@ -330,8 +330,8 @@ server <- function(input, output, session) {
   input_df_hobo <- reactive({
     req(input$file2)
     
-    output$hobo_warning <- validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc"), 
-                                         "Пожалуйста, загрузите текстовый файл (txt, csv, asc)"),
+    output$hobo_warning <- validate(need(tools::file_ext(input$file2$datapath) == c("csv", "txt", "asc", "xlsx"), 
+                                         "Пожалуйста, загрузите текстовый файл (txt, csv, asc) или файл xlsx."),
                                     need(input$station_hobo_id != '', 'Выберите название станции!')
     )
     
