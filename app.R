@@ -202,6 +202,7 @@ ui <- dashboardPage(skin = 'red',
   )
 )
 
+# сервер ----
 server <- function(input, output, session) {
   source('source//helpers_funs.R', local = T, encoding = 'UTF-8')
   

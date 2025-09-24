@@ -155,9 +155,15 @@ read.hobo <- function() {
     hobo_df <- read.csv(file = filename, 
                         sep = ',',  encoding = 'UTF-8', header = F, skip = skipl,
                         col.names = coln)
-    hobo_df <- hobo_df %>%
-      mutate(datetime = as.POSIXct(strptime(datetime, format = '%m.%d.%y %I:%M:%S %p')),
-             station_name = station_name)
+    if (grepl(".", hobo_df$datetime)) {
+      hobo_df <- hobo_df %>%
+        mutate(datetime = as.POSIXct(strptime(datetime, format = '%m.%d.%y %I:%M:%S %p')),
+               station_name = station_name) 
+    } else if (grepl("-", hobo_df$datetime)) {
+      hobo_df <- hobo_df %>%
+        mutate(datetime = as.POSIXct(strptime(datetime, format = '%m-%d-%y %I:%M:%S %p')),
+               station_name = station_name) 
+    }
   }else if (input$hobo_xls == '1'){
     hobo_df <- read_xlsx(path = filename, skip = skipl, 
                          col_types = colt,
@@ -182,11 +188,11 @@ get_weather_station_list_selectInput <-
   function(st_type = NULL, mult = F, input_id = 'station_id') {
     renderUI({
       if (is.null(st_type)) {
-        q <- paste0("SELECT DISTINCT name, id FROM field_site")
+        q <- paste0("SELECT DISTINCT name, id FROM field_site ORDER BY id")
       } else{
         q <-
           paste0("SELECT DISTINCT name, id FROM field_site WHERE type = ",
-                 st_type)
+                 st_type, " ORDER BY id")
       }
       st_list <- dbGetQuery(con, q)
       st_choice <- as.list(st_list$id)
